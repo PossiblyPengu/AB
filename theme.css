@@ -1,0 +1,482 @@
+/* Shared theme variables and basic components for SSSuite */
+:root{
+  /* Primary palette */
+  --bg-primary: #f7fafc;
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --muted: #6b7280;
+
+  /* Legacy/in-page compatibility variables */
+  --ink-1: #1f2937;
+  --ink-2: #0b1220;
+  --light: #ffffff;
+  --pink-1: #60a5fa; /* match AllocationBuddy splash blue */
+  --pink-2: #06b6d4; /* complementary teal used in AllocationBuddy gradient */
+  --pink-light: #fdf2f8;
+  --gradient-dark: linear-gradient(135deg, var(--ink-1) 0%, var(--ink-2) 100%);
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  /* ExpireWise hero gradient (pink -> yellow) */
+  --gradient-expire: linear-gradient(135deg, #f472b6 0%, #fbbf24 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+
+  /* Buttons & UI */
+  --bg-button: #e2e8f0;
+  --bg-button-hover: #cbd5e1;
+  --bg-accent: #3b82f6;
+  --bg-accent-20: rgba(59,130,246,0.2);
+  --text-inverse: #ffffff;
+  /* Page background helpers (allocation buddy uses a patterned background) */
+  --body-bg: radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), radial-gradient(rgba(0,0,0,0.12) 1px, transparent 1px), linear-gradient(180deg, #2b3039 0%, #1f232b 100%);
+  --body-bg-color: #2f343e;
+
+  /* Accents */
+  --accent: #60a5fa; /* blue-400 */
+  --accent-2: #06b6d4; /* teal-400 */
+  --accent-strong: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+
+  /* legacy pink token removed; brand indigo already defined above */
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  --gradient-success: linear-gradient(135deg,#22c55e 0%,#16a34a 100%);
+
+  /* Rank badges (centralized) */
+  --rank-aa: #FFD700;
+  --rank-aa-text: #000;
+  --rank-a: #FF4500;
+  --rank-a-text: #fff;
+  --rank-b: #1E90FF;
+  --rank-b-text: #fff;
+  --rank-c: #32CD32;
+  --rank-c-text: #fff;
+
+  /* Borders & inputs */
+  --border-muted: #e5e7eb; /* used for subtle card/list borders */
+  --input-border: #dddddd;
+  /* Print-specific tokens for printable reports */
+  --print-border: #dddddd;
+  --print-th-bg: #f2f2f2;
+  /* Pale info background used for low-priority rows */
+  --info-06: rgba(227,242,253,0.6);
+
+  /* Dialog backdrop token (used by pages that reference dialog-backdrop) */
+  --dialog-backdrop: rgba(0,0,0,0.55);
+
+  /* Alerts */
+  --alert-info-bg: rgba(96,165,250,0.06); /* pale splash-blue tint */
+  --alert-info-border: #60a5fa; /* splash blue */
+
+  /* Soft accent used for pale headings and light text accents (was pale pink) */
+  --accent-soft: #e9d5f9; /* pale indigo in light mode */
+
+  /* Semantic button backgrounds (shades/overlays) */
+  --success-20: rgba(22,163,74,0.26);
+  --success-border: rgba(22,163,74,0.55);
+  --success-text: #1b5e20;
+  --warning-20: rgba(255,235,59,0.28);
+  --warning-06: rgba(245,158,11,0.06);
+  --warning-border: rgba(255,235,59,0.6);
+  --warning-text: #7a5f00;
+
+  /* Help button (visible surface in light mode; flips in dark mode) */
+  --help-btn-bg: #f1f5f9; /* light, slightly bluish panel color */
+  --help-btn-border: #e2e8f0; /* subtle border that matches light card edges */
+  --help-btn-color: #0f172a; /* dark color by default for light mode */
+
+  /* Semantic colors */
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --danger-20: rgba(239,68,68,0.06);
+  --danger-border: rgba(252,165,165,0.25);
+
+  /* Delta badges (light mode) */
+  --delta-auto-bg: #e8f5e8;
+  --delta-auto-border: #c8e6c9;
+  --delta-auto-text: #1b5e20;
+  --delta-manual-bg: #fff9c4;
+  --delta-manual-border: #ffe082;
+  --delta-manual-text: #7a5f00;
+
+  /* Copied / small badges */
+  --copied-badge-bg: rgba(99,102,241,0.08);
+  --copied-badge-text: #3730a3;
+  --copied-badge-border: rgba(99,102,241,0.16);
+
+  /* Toasts */
+  --toast-bg: #111827;
+  --toast-text: #ffffff;
+  --toast-light-bg: #f8fafc;
+  --toast-light-border: #e5e7eb;
+
+  /* Elevation */
+  --shadow-1: 0 6px 18px rgba(2,6,23,0.08);
+  --shadow-2: 0 20px 50px rgba(2,6,23,0.12);
+
+  /* Additional shadow aliases used by pages */
+  --shadow-xs: 0 2px 6px rgba(2,6,23,0.06);
+  --shadow-sm: 0 6px 12px rgba(2,6,23,0.12);
+  --shadow-md: var(--shadow-1);
+  --shadow-lg: var(--shadow-2);
+  --shadow-custom: 0 10px 30px rgba(0,0,0,.35);
+  --shadow-soft: 0 6px 18px rgba(0,0,0,.25);
+
+  /* Overlay/backdrop */
+  --overlay-backdrop: rgba(0,0,0,0.7);
+  --overlay-shadow: rgba(0,0,0,0.3);
+
+  /* Semantic subtle shades used by pages */
+  --danger-06: rgba(239,68,68,0.06);
+  --danger-12: rgba(239,68,68,0.12);
+  --warning-06: rgba(245,158,11,0.06);
+  --warning-12: rgba(245,158,11,0.12);
+  --success-06: rgba(34,197,94,0.2);
+
+  /* Border & card helpers (aliases) */
+  --border-light: rgba(15,23,42,0.04);
+  --border-medium: rgba(15,23,42,0.06);
+  --border-strong: rgba(15,23,42,0.12);
+  --border-color: var(--border-medium);
+
+  /* Background helpers used by pages */
+  --bg-secondary: var(--bg-card);
+  --bg-tertiary: var(--bg-button);
+  --bg-input: var(--light);
+  --bg-success: var(--success-20);
+  --bg-danger: var(--danger-20);
+
+  /* Fade overlays (used by scroll fades) */
+  --fade-top-light: linear-gradient(to bottom, rgba(255,255,255,0.95), rgba(255,255,255,0));
+  --fade-bottom-light: linear-gradient(to top, rgba(255,255,255,0.95), rgba(255,255,255,0));
+  --fade-top-dark: linear-gradient(to bottom, rgba(0,0,0,0.85), rgba(0,0,0,0));
+  --fade-bottom-dark: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0));
+
+  /* Flash / pulse tokens for attention animations */
+  --flash-accent-start: rgba(255,105,180,0.0);
+  --flash-accent-peak: rgba(255,105,180,0.15);
+
+  /* Accent hover alias */
+  --bg-accent-hover: rgba(59,130,246,0.85);
+
+  /* Palette additions referenced by pages' JS */
+  --purple: #6366f1;
+  --violet: #a855f7;
+  --indigo: #4440ff;
+  --teal: #065f46;
+  --info: #06b6d4;
+  --success-2: #22c55e;
+  /* Boost/bright shades used by some pages in overlays (light/dark variants) */
+  --accent-boost: #93c5fd; /* used as a brighter accent in overlays */
+  --success-boost: #86efac; /* used as a brighter success tint in overlays */
+}
+
+/* Dark theme overrides */
+[data-theme="dark"]{
+  --bg-primary: #0b1220;
+  --bg-card: #0f1724;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --muted: #9ca3af;
+
+  --accent: #60a5fa;
+  --accent-2: #06b6d4;
+  /* Dark-mode variants for boosted shades */
+  --accent-boost: #93c5fd;
+  --success-boost: #86efac;
+  --accent-strong: linear-gradient(135deg, #60a5fa 0%, #06b6d4 100%);
+
+  /* Dark compatibility */
+  --ink-1: #f1f5f9;
+  --ink-2: #e5e7eb;
+  --light: #0a0a0a;
+  --pink-1: #60a5fa; /* dark-theme: keep splash blue */
+  --pink-2: #06b6d4;
+  /* Dark-mode soft accent + alert adjustments */
+  --accent-soft: #bfc7ff;
+  --alert-info-bg: rgba(79,70,229,0.06);
+  --alert-info-border: var(--pink-1);
+  --pink-light: #2a0b18;
+  --gradient-dark: linear-gradient(135deg, #111 0%, #000 100%);
+  --bg-button: #475569;
+  --bg-button-hover: #64748b;
+  --bg-accent-20: rgba(59,130,246,0.1);
+
+  /* Ensure help button text is readable in dark mode */
+  --help-btn-color: #ffffff;
+  --help-btn-bg: rgba(255,255,255,0.06);
+  --help-btn-border: rgba(255,255,255,0.08);
+}
+
+/* Consolidated dark-mode card contrast helpers applied when the dark theme is active */
+[data-theme="dark"] .card,
+[data-theme="dark"] .header-card,
+[data-theme="dark"] .store-pane,
+[data-theme="dark"] .sidebar .card,
+[data-theme="dark"] .main-area .card,
+[data-theme="dark"] .store-pane-body,
+[data-theme="dark"] .queue-item{
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+  box-shadow: 0 6px 18px rgba(2,6,12,0.6);
+}
+
+/* Common layout helpers (light-weight) */
+.container{max-width:min(1200px,96vw);margin:0 auto;padding:clamp(12px,2vw,24px)}
+.card{background:var(--bg-card);border-radius:clamp(8px,2vw,12px);padding:clamp(12px,2vw,18px);border:1px solid rgba(15,23,42,0.04);box-shadow:var(--shadow-1);color:var(--text-primary)}
+
+/* Buttons */
+.big-button, .btn{display:inline-flex;align-items:center;gap:clamp(6px,2vw,12px);padding:clamp(8px,2vw,14px) clamp(10px,3vw,18px);border-radius:clamp(8px,2vw,12px);border:none;cursor:pointer;background:var(--accent-strong);color:var(--text-inverse);font-weight:600;transition:transform .06s ease, box-shadow .12s ease, opacity .12s ease}
+.btn.outline{background:transparent;color:var(--text-primary);border:1px solid var(--border-light)}
+.btn.small{padding:clamp(6px,1vw,10px) clamp(8px,2vw,12px);font-size:clamp(12px,2vw,13px)}
+
+/* Default button element styling - ensure native buttons match .btn */
+button, input[type="button"], input[type="submit"], .btn {
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+}
+
+/* Hover / focus / active states */
+.big-button:hover, .btn:hover{filter:brightness(.98); box-shadow:0 8px 20px rgba(2,6,23,0.08); transform:translateY(-1px)}
+.big-button:active, .btn:active{transform:translateY(0)}
+.big-button:focus, .btn:focus{outline:3px solid var(--bg-accent-20); outline-offset:2px}
+.btn:disabled, .big-button:disabled{opacity:0.6;cursor:not-allowed}
+
+/* Semantic variants keep earlier names but rely on tokens */
+.big-button.success{background:var(--gradient-success); color:var(--text-inverse)}
+.big-button.warning{background:var(--gradient-warning); color:var(--text-inverse)}
+.big-button.danger{background:var(--gradient-danger); color:var(--text-inverse)}
+
+/* Unified control styles: selects, inputs, textareas */
+select, input[type="text"], input[type="number"], input[type="search"], textarea {
+  background:var(--bg-input);
+  color:var(--text-primary);
+  border:1px solid var(--border-light);
+  padding:clamp(6px,1vw,10px) clamp(8px,2vw,12px);
+  border-radius:clamp(6px,2vw,8px);
+  transition:box-shadow .12s ease, border-color .12s ease;
+}
+select:focus, input:focus, textarea:focus{
+  outline:none; box-shadow:0 6px 18px rgba(59,130,246,0.06); border-color:var(--bg-accent);
+}
+
+/* Dropdown / menu base styles (used by pages that implement dropdown markup) */
+.dropdown{position:relative;display:inline-block}
+.dropdown-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.dropdown-menu{position:absolute;top:100%;left:0;min-width:180px;background:var(--bg-card);border:1px solid var(--border-light);box-shadow:var(--shadow-1);border-radius:8px;padding:6px 8px;z-index:9999}
+.dropdown-menu a, .dropdown-menu button{display:block;padding:8px 10px;color:var(--text-primary);text-decoration:none;border-radius:6px}
+.dropdown-menu a:hover, .dropdown-menu button:hover{background:var(--bg-accent-20)}
+
+/* Checkbox / Radio custom cosmetics while preserving native controls for accessibility */
+input[type="checkbox"], input[type="radio"]{width:18px;height:18px;vertical-align:middle;margin:0 6px 0 0}
+input[type="checkbox"]:focus, input[type="radio"]:focus{outline:3px solid var(--bg-accent-20);outline-offset:2px}
+
+/* Toggle / switch consistency (legacy names preserved) */
+.toggle-switch{width:56px;height:28px;background:var(--bg-button);border-radius:9999px;position:relative;cursor:pointer;transition:all .24s ease;border:1px solid var(--border-light)}
+.toggle-switch::after{content:"";position:absolute;width:22px;height:22px;background:var(--light);border-radius:50%;top:3px;left:3px;transition:all .2s ease;box-shadow:0 6px 12px rgba(2,6,23,0.12)}
+.toggle-switch.active{background:var(--accent);border-color:var(--accent)}
+.toggle-switch.active::after{transform:translateX(28px)}
+
+/* Theme switch (form input variant) already exists; ensure it uses tokens */
+.theme-switch{position:relative;display:inline-block;width:56px;height:30px}
+.switch-slider{position:absolute;inset:0;background:var(--bg-button);border-radius:30px;transition:background .18s}
+.switch-slider .switch-knob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--light);transition:left .18s}
+.theme-switch input:checked + .switch-slider{background:var(--accent)}
+.theme-switch input:checked + .switch-slider .switch-knob{left:29px}
+
+/* Small helpers for consistent spacing in control groups */
+.control-row{display:flex;align-items:center;gap:8px}
+.form-label{font-size:13px;color:var(--text-secondary)}
+
+/* Utility to make form controls span available width */
+.full-width{width:100%}
+
+/* Simple spacing utilities used by pages when removing inline margins */
+.mt-12{margin-top:12px}
+.mt-10{margin-top:10px}
+.mt-8{margin-top:8px}
+.mb-10{margin-bottom:10px}
+
+/* Compact input variant used by small numeric controls in dev tools */
+.input-compact{padding:6px;border:1px solid var(--input-border);border-radius:6px;font-size:13px}
+
+/* Simple flex utility */
+.flex-1{flex:1}
+
+/* Fixed width helpers */
+
+.w-60{width:clamp(40px,8vw,60px)}
+.min-w-220{min-width:clamp(120px,30vw,220px)}
+
+/* Additional fixed width used by templates */
+.w-90{width:clamp(60px,12vw,90px)}
+
+/* Small left margin utility */
+.ml-8{margin-left:8px}
+
+/* Square remove button variant to mirror inline styles removed from templates */
+.remove-btn.square{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;padding:0}
+/* Visual tokens for the square remove button */
+.remove-btn.square{background:var(--light);border:1px solid var(--border-muted);color:var(--danger)}
+
+/* Monospace textarea used for pasted data */
+.textarea-mono{font-family:monospace;font-size:12px;padding:10px;border:1px solid var(--border-muted);border-radius:6px;height:100px}
+
+/* Global utilities */
+.hidden{display:none}
+.text-right{text-align:right}
+
+/* Legacy toggle used by Allocation Buddy */
+.toggle-switch{width:50px;height:24px;background:rgba(255,255,255,.12);border-radius:12px;position:relative;cursor:pointer;transition:all .3s ease;border:2px solid rgba(255,255,255,.18)}
+.toggle-switch::after{content:"";position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:1px;left:1px;transition:all .3s ease;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+.toggle-switch.active{background:var(--pink-1);border-color:var(--pink-1)}
+.toggle-switch.active::after{transform:translateX(26px)}
+.toggle-icon{font-size:16px}
+
+/* Floating Go-To-Top button (shared style) */
+.back-to-top{position:fixed;right:28px;bottom:80px;width:44px;height:44px;border-radius:9999px;border:none;cursor:pointer;background:var(--gradient-primary);color:var(--text-inverse);font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-2);opacity:0;pointer-events:none;transform:translateY(10px) scale(.96);transition:opacity .2s ease, transform .2s ease, box-shadow .2s ease;z-index:9998}
+.back-to-top.show{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+.back-to-top:hover{box-shadow:0 12px 28px rgba(0,0,0,.3);transform:translateY(-2px) scale(1.02)}
+
+/* Utility fallback for pages using body.dark-mode selectors */
+/* legacy compatibility: selectors like body.dark-mode are supported via JS toggle */
+
+/* App icon */
+.app-icon{width:clamp(60px,10vw,96px);height:clamp(60px,10vw,96px);border-radius:clamp(12px,3vw,20px);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:clamp(1.5rem,4vw,2.25rem);color:var(--text-primary);background:rgba(255,255,255,0.15)}
+
+/* Ensure app icon text flips color in dark mode */
+[data-theme="dark"] .app-icon,
+body.dark-mode .app-icon,
+.dark-mode .app-icon { color: var(--text-inverse); }
+
+/* Theme switch */
+.theme-switch{position:relative;display:inline-block;width:50px;height:28px}
+.theme-switch input{opacity:0;width:0;height:0}
+.switch-slider{position:absolute;inset:0;background:rgba(15,23,42,0.06);border-radius:28px;transition:background .2s}
+.switch-slider .switch-knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s}
+.theme-switch input:checked + .switch-slider{background:var(--accent)}
+.theme-switch input:checked + .switch-slider .switch-knob{left:25px}
+
+/* Utility */
+.text-muted{color:var(--muted)}
+.header{margin-bottom:28px}
+.footer{margin-top:32px;padding-top:14px;border-top:1px solid rgba(15,23,42,0.04);color:var(--muted)}
+
+/* Header card & back-row helpers (shared) */
+.header-card{
+  background:var(--bg-card);
+  border-radius:clamp(8px,2vw,12px);
+  padding:clamp(12px,2vw,18px);
+  border:1px solid rgba(15,23,42,0.04);
+  box-shadow:var(--shadow-1);
+  color:var(--text-primary);
+  margin:0 0 clamp(16px,2vw,24px) 0;
+  width:auto;
+  max-width:unset;
+}
+.back-row{width:100%;text-align:left;margin-bottom:8px}
+
+/* Ensure header inside a .header-card doesn't apply its own extra card-like chrome
+  Avoid duplicated background/border/shadow and excessive padding so the .header-card
+  dimensions follow the header content closely. */
+.header-card > header{background:transparent;border:none;box-shadow:none;padding:0;margin:0;}
+.header-card > header .title{gap:6px}
+
+/* Stronger overrides to counter page-level dark-mode or legacy header rules that may set
+   a background on all <header> elements (e.g. `body.dark-mode header { background: ... }`).
+   These selectors are more specific so they win even if page CSS is declared after theme.css. */
+body.dark-mode .header-card > header,
+[data-theme="dark"] .header-card > header,
+.dark-mode .header-card > header {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  color: inherit; /* ensure text color comes from card tokens */
+}
+
+/* Responsive tweaks */
+@media (max-width:900px){
+  .container{padding:clamp(8px,2vw,16px)}
+  .app-icon{width:clamp(48px,10vw,80px);height:clamp(48px,10vw,80px);font-size:clamp(1.2rem,4vw,1.9rem)}
+  .header-card{padding:clamp(8px,2vw,14px)}
+  .card{padding:clamp(8px,2vw,14px)}
+  .big-button, .btn{padding:clamp(6px,2vw,10px) clamp(8px,3vw,14px)}
+}
+
+/* Site width token and consistent container alignment */
+:root{--site-max-width:1200px}
+
+/* Ensure header-card and results-shell center and don't exceed site width */
+.header-card{max-width:100%;width:100%;box-sizing:border-box;padding:14px 18px;margin:0 auto 24px auto}
+.results-shell{max-width:100%;width:100%;box-sizing:border-box;padding:16px}
+.site-row{max-width:var(--site-max-width);margin-left:auto;margin-right:auto;width:100%;box-sizing:border-box}
+
+/*
+  Unified card-surface helpers
+  ----------------------------
+  Make sure every page uses the same card surface tokens in light and dark modes.
+  Pages may reference selectors like .card, .bg-card, .bg-card-secondary, .store-pane,
+  .header-card, .store-item, .queue-item, and .help-content — apply a single surface
+  rule for light mode here and rely on the consolidated dark-mode block above.
+*/
+/* Light-mode unified surface (uses tokens from :root) */
+[data-theme="light"] .card,
+[data-theme="light"] .bg-card,
+[data-theme="light"] .bg-card-secondary,
+[data-theme="light"] .header-card,
+[data-theme="light"] .store-pane,
+[data-theme="light"] .store-item,
+[data-theme="light"] .queue-item,
+[data-theme="light"] .store-pane-body,
+[data-theme="light"] .help-content,
+[data-theme="light"] .store-pane-actions,
+[data-theme="light"] .store-pane .store-pane-header,
+[data-theme="light"] .store-pane .store-pane-body .scroll-hint {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-1);
+}
+
+/* Backwards-compat: support body.dark-mode and .dark-mode page rules that some files still use */
+body.dark-mode .card,
+.dark-mode .card,
+body.dark-mode .header-card,
+.dark-mode .header-card,
+body.dark-mode .store-pane,
+.dark-mode .store-pane {
+  /* Use the same subtle translucent surface as the attribute-based dark theme
+     so legacy pages that toggle `body.dark-mode` don't get a hard #0f1724
+     card background. This matches the look from `[data-theme="dark"]` above. */
+  background: rgba(255,255,255,0.03);
+  color: var(--text-inverse);
+  border-color: rgba(255,255,255,0.06);
+  /* Softer shadow in legacy dark-mode to avoid heavy black halos */
+  box-shadow: 0 6px 12px rgba(2,6,12,0.32);
+}
+
+/* Slightly different token for secondary list rows that expect a subtle contrast */
+.bg-card-secondary, .store-item, .queue-item { background: var(--bg-secondary); }
+
+/* Ensure help/dialog content uses the same card style unless explicitly overridden */
+.help-content { background: var(--bg-card); color: var(--text-primary); border:1px solid var(--border-light); }
+
+/* Defensive: ensure light-theme main content uses primary text color
+   This prevents accidental white text when a page has unscoped rules that
+   set `color: var(--text-inverse)` without restricting to dark mode. We
+   scope to `.container` so small controls with intentional inverse text
+   (buttons on gradients) are not overridden. */
+[data-theme="light"] .container,
+body:not(.dark-mode) .container,
+.light-mode .container {
+  color: var(--text-primary);
+}
+
+
+@media (max-width:1200px){
+  .header-card{padding:clamp(8px,2vw,14px)}
+  .results-shell{padding:clamp(8px,2vw,14px)}
+}
+
+/* Optional helper: uniform rows that match container width */
+.site-row{max-width:var(--site-max-width);margin-left:auto;margin-right:auto;width:100%;box-sizing:border-box}

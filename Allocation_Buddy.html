@@ -1,0 +1,3044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Allocation Buddy - Compact Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Pre-apply theme to avoid white flash during launcher navigation -->
+  <script>
+    (function(){
+      try {
+        var saved = null; try { saved = localStorage.getItem('appTheme'); } catch(_) { saved = null; }
+        if (saved) {
+          try { document.documentElement.setAttribute('data-theme', saved); } catch(_){}
+          try { if (saved === 'dark') document.body.classList.add('dark-mode'); else document.body.classList.remove('dark-mode'); } catch(_){}
+          try {
+            if (saved === 'dark') {
+              document.documentElement.style.backgroundColor = '#08121a';
+              document.body.style.backgroundColor = '#08121a';
+            } else {
+              document.documentElement.style.backgroundColor = '#f7f9fc';
+              document.body.style.backgroundColor = '#f7f9fc';
+            }
+          } catch(_){}
+        }
+      } catch(_){}
+    })();
+  </script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+      background-color:var(--body-bg-color);
+      background-image:var(--body-bg);
+      background-size:24px 24px, 24px 24px, auto;
+      background-position:0 0, 12px 12px, 0 0;
+      min-height:100vh;padding:clamp(8px,2vw,18px);color:var(--text-primary);}
+  .container{max-width:min(1200px,96vw);margin:0 auto;background:transparent;border-radius:clamp(10px,2vw,15px);box-shadow:none;overflow:visible;}
+
+  /* Allow incoming slide-in from launcher */
+  .slide-in-from-left { animation: slideInLeft 420ms cubic-bezier(.2,.9,.2,1) both; }
+  .slide-in-from-right { animation: slideInRight 420ms cubic-bezier(.2,.9,.2,1) both; }
+  @keyframes slideInLeft { from { transform: translateX(-110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes slideInRight { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .header, header{
+    background:var(--light);
+    color:var(--text-primary);
+    padding:clamp(12px,2vw,20px);
+    text-align:left;
+    position:relative;
+    overflow:visible;
+    border:1px solid var(--border-light);
+    border-radius:clamp(8px,2vw,12px);
+    box-shadow:var(--shadow-md);
+    margin:clamp(8px,2vw,14px) auto;
+    max-width:min(1200px,96vw);
+  }
+  /* Layout header as a flex row so title and controls are spaced correctly */
+  header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .title{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    flex:1 1 auto;
+    min-width:0; /* allow flex children to truncate properly */
+  }
+  .title strong{font-size:clamp(1.2rem,2.5vw,1.875rem);font-weight:700;color:var(--text-primary)}
+  .title .pill{font-size:clamp(0.85rem,2vw,0.95rem);color:var(--text-secondary);background:transparent;padding:0;border:none}
+  /* Dark mode: keep header card style but invert text color for headers except the site header */
+  body.dark-mode header:not(.site-header){ background:var(--bg-card); color:var(--text-inverse); }
+    .header h1,.header p, header h1, header p{position:relative;z-index:1}
+    .header h1, header h1{font-size:clamp(1.4rem,1.2vw+1rem,2.2rem);margin-bottom:8px;font-weight:300;}
+  .help-button{position:relative;z-index:2;padding:clamp(4px,1vw,8px) clamp(6px,2vw,12px);font-size:clamp(11px,2vw,13px);line-height:1;background:var(--help-btn-bg);border:1px solid var(--help-btn-border);color:var(--help-btn-color);border-radius:clamp(4px,2vw,8px);cursor:pointer;transition:all .2s ease;display:inline-flex;align-items:center;gap:clamp(4px,2vw,10px);}
+  .help-button:hover{background:var(--help-btn-bg);border-color:var(--help-btn-border);}    
+  /* Keep inner button text, but let wrapper handle clicks/size */
+  .help-button button{background:transparent;border:none;color:inherit;font:inherit;padding:0;margin:0;pointer-events:none}
+  .dark-mode-toggle{position:absolute;top:20px;right:20px;display:flex;align-items:center;gap:12px;color:var(--help-btn-color);font-size:14px;font-weight:500;z-index:10;}
+  /* Use centralized toggle / switch styles from theme.css */
+    .toggle-icon{font-size:16px;transition:all .3s ease;}
+  .dashboard{padding:clamp(10px,2vw,28px);display:grid;grid-template-columns:clamp(180px,28vw,420px) 1fr;gap:clamp(10px,1.4vw,28px);align-items:stretch;}    
+    .sidebar,.main-area{display:flex;flex-direction:column;gap:20px;}
+    /* Make the Store Management card fill the column height */
+    .sidebar .card{flex:0 0 auto;display:flex;flex-direction:column;overflow:hidden;}
+    .sidebar .card .import-content{flex:1 1 auto;display:none;flex-direction:column;min-height:0;}
+    .sidebar .card .import-content.active{display:flex;}
+    .sidebar .store-list{flex:1 1 auto;max-height:none;min-height:0;overflow:auto;}
+  .card{background:var(--bg-card);border:1px solid var(--border-light);border-radius:clamp(8px,2vw,12px);padding:clamp(10px,2vw,20px);box-shadow:var(--shadow-xs);}
+  .card h3{color:var(--text-primary);margin-bottom:15px;font-size:1.1em;display:flex;align-items:center;gap:8px;}
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:clamp(10px,1.2vw,18px);}    
+  .stat-card{background:var(--bg-card);color:var(--text-primary);padding:clamp(12px,1.6vw,22px);border-radius:10px;text-align:center;border:1px solid var(--border-muted);box-shadow:var(--shadow-xs)}
+    .stat-value{font-size:clamp(1.4rem,2.2vw,2.4rem);font-weight:bold;display:block;}
+    .stat-label{font-size:0.9em;opacity:0.9;margin-top:5px;}
+  .import-tabs{display:flex;background:var(--bg-button);border-radius:8px;padding:3px;margin-bottom:15px;}
+    .import-tab{flex:1;padding:8px 15px;background:transparent;border:none;border-radius:5px;cursor:pointer;font-weight:500;transition:all 0.3s ease;text-align:center;font-size:14px;}
+  .import-tab.active{background:var(--pink-1);color:var(--text-inverse);}
+  .import-tab:hover:not(.active){background:var(--accent-soft);}
+    .import-content{display:none;}
+    .import-content.active{display:block;}
+  .upload-area{border:2px dashed var(--border-light);border-radius:8px;padding:20px;text-align:center;background:var(--pink-light);} 
+  .upload-area:hover{border-color:var(--pink-1);background:var(--pink-light);} 
+  .upload-area.dragover{border-color:var(--pink-1);background:var(--pink-light);} 
+    .store-list{max-height:min(38vh,420px);overflow-y:auto;border:1px solid var(--border-muted);border-radius:6px;padding:10px;}
+  .store-item{display:flex;align-items:center;padding:8px;margin:2px 0;background:var(--bg-card);border-radius:4px;font-size:14px;}
+    .store-item input{margin-right:10px;}
+    .store-item .info{flex:1;display:flex;align-items:center;gap:10px;}
+    .store-item .code{font-weight:bold;min-width:40px;}
+    .store-item .name{font-size:12px;color:var(--text-secondary);}
+    .rank-badge{background:var(--pink-1);color:var(--text-inverse);padding:2px 6px;border-radius:8px;font-size:10px;font-weight:500;}
+    .rank-badge.rank-aa{background:var(--rank-aa)!important;color:var(--rank-aa-text)!important;}
+    .rank-badge.rank-a{background:var(--rank-a)!important;color:var(--rank-a-text)!important;}
+    .rank-badge.rank-b{background:var(--rank-b)!important;color:var(--rank-b-text)!important;}
+    .rank-badge.rank-c{background:var(--rank-c)!important;color:var(--rank-c-text)!important;}
+    .remove-btn{background:var(--danger);color:var(--text-inverse);border:none;border-radius:3px;padding:3px 6px;cursor:pointer;font-size:11px;}
+    .add-store{display:grid;gap:10px;}
+    .add-store input,.add-store select{padding:8px;border:1px solid var(--input-border);border-radius:6px;font-size:14px;}
+    .queue{max-height:250px;overflow-y:auto;}
+  .queue-item{display:flex;justify-content:space-between;align-items:center;padding:10px;margin:5px 0;background:var(--bg-card);border-radius:6px;font-size:14px;}
+  .queue-item .details{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+  .big-button{background:var(--gradient-primary);color:var(--text-inverse);border:none;padding:clamp(8px,2vw,14px) clamp(12px,3vw,20px);border-radius:clamp(6px,2vw,10px);cursor:pointer;font-size:clamp(13px,2vw,16px);font-weight:500;transition:all .3s ease;}
+  .big-button:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm);} 
+    .big-button.success{background:var(--gradient-success);} 
+    .big-button.warning{background:var(--gradient-warning);} 
+    .big-button.danger{background:var(--gradient-danger);}
+    .big-button.large{font-size:16px;padding:15px 25px;}
+    .big-button:disabled{opacity:0.55;cursor:not-allowed;}
+    /* Match specific action buttons to their highlight colors (light mode) */
+  #distributeBtn{background:var(--bg-success);color:var(--success-text);border:1px solid var(--success-border);box-shadow:var(--shadow-sm);} 
+  #distributeBtn:hover{box-shadow:var(--shadow-md);} 
+  #manualAssignBtn{background:var(--warning-20);color:var(--warning-text);border:1px solid var(--warning-border);box-shadow:var(--shadow-sm);} 
+  #manualAssignBtn:hover{box-shadow:var(--shadow-md);} 
+    .hidden{display:none;}
+    .simple-alert{padding:12px;border-radius:6px;margin:10px 0;font-size:14px;}
+  .alert-info{background:var(--alert-info-bg);border:1px solid var(--alert-info-border);color:var(--ink-1);} 
+    /* De-emphasize inline strong; themed band added separately */
+    #resultsContainer .alert-info > strong{display:none;} 
+  .alert-success{background:var(--alert-info-bg);border:1px solid var(--alert-info-border);color:var(--ink-1);} /* pink-tinted */
+  .alert-warning{background:var(--alert-info-bg);border:1px solid var(--alert-info-border);color:var(--ink-1);} /* softer pink */
+  .alert-danger{background:var(--alert-info-bg);border:1px solid var(--alert-info-border);color:var(--ink-1);} /* deeper pink */
+    .store-panes{margin:20px 0;}
+    /* Results title header band */
+  .results-title{background:var(--pink-1);color:var(--text-inverse);padding:12px 16px;border-radius:10px;margin:10px 0 10px 0;font-weight:700;font-size:18px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-xs);}
+  .results-header-band{background:var(--gradient-primary);color:var(--text-inverse);padding:12px 16px;border-radius:12px;margin-bottom:12px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-md);} 
+  .results-header-title{font-size:1.8em;margin:0;display:flex;align-items:center;gap:12px;color:inherit}
+  .step-badge{background:var(--light);color:var(--pink-2);width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;box-shadow:var(--shadow-sm)}
+    .step-badge svg{width:22px;height:22px;display:block}
+  .store-pane{background:var(--bg-card);border:2px solid var(--border-muted);border-radius:12px;margin-bottom:20px;overflow:hidden;}
+  .store-pane-header{background:var(--bg-card);color:var(--text-primary);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--border-muted)}
+  .store-pane-header.copied-collapsed{background:var(--bg-card);}
+    .store-pane-title{font-weight:bold;font-size:18px;display:flex;align-items:center;gap:10px;}
+    .store-pane-stats{font-size:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .copy-btn{background:var(--light);color:var(--ink-2);border:1px solid var(--border-muted);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:600;}
+    .copy-btn:hover{filter:brightness(0.95);} 
+    /* Responsive 2-col layout used near actions section */
+    .two-col{display:grid;grid-template-columns:2fr 1fr;gap:clamp(12px,1.4vw,24px);}    
+    @media (max-width:1100px){.two-col{grid-template-columns:1fr;}}
+  .copied-badge{background:var(--copied-badge-bg);color:var(--copied-badge-text);border:1px solid var(--copied-badge-border);padding:3px 8px;border-radius:9999px;font-size:12px;font-weight:700;}
+    .store-pane-body{padding:10px 12px 10px;overflow:auto;max-height:calc(80vh - 220px);position:relative;}    
+    /* Disable pseudo fades (replaced by sticky elements below) */
+    .store-pane-body.scrollable::before,
+    .store-pane-body.scrollable::after{content:none !important}
+    /* Sticky scroll fades as real elements so they don't scroll with content */
+    .store-pane-body .fade-top,
+    .store-pane-body .fade-bottom{position:-webkit-sticky;position:sticky;display:block;height:24px;pointer-events:none;z-index:1;transition:opacity .2s ease;margin-left:-12px;margin-right:-12px}
+  .store-pane-body .fade-top{top:-10px;margin-top:0;background:var(--fade-top-light);border-top-left-radius:12px;border-top-right-radius:12px}
+  .store-pane-body .fade-bottom{bottom:-10px;margin-bottom:0;background:var(--fade-bottom-light);border-bottom-left-radius:12px;border-bottom-right-radius:12px}
+    .store-pane-body.at-top .fade-top{opacity:0}
+    .store-pane-body.at-bottom .fade-bottom{opacity:0}
+    /* Scroll for more pill (sticky at bottom of scroll container) */
+  .store-pane-body .scroll-hint{position:-webkit-sticky;position:sticky;bottom:0;display:block;width:max-content;margin:0 auto;padding:3px 10px;border-radius:9999px;font-size:12px;line-height:1;background:var(--bg-card);border:1px solid var(--border-muted);color:var(--text-primary);box-shadow:var(--shadow-xs);pointer-events:none;opacity:0;transition:opacity .2s ease;z-index:1}
+    .store-pane-body .scroll-hint.show{opacity:1}
+    /* Dark mode variants */
+  body.dark-mode .store-pane-body .fade-top{background:var(--fade-top-dark)}
+  body.dark-mode .store-pane-body .fade-bottom{background:var(--fade-bottom-dark)}
+  body.dark-mode .store-pane-body .scroll-hint{background:var(--bg-card);border-color:var(--border-muted);color:var(--text-inverse)}
+  .store-pane-actions{padding:10px 12px 12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border-muted);background:var(--bg-card);}
+    .store-pane-table{width:100%;border-collapse:collapse;}
+    /* Sticky headers for issues table */
+    .sticky-head thead th{position:sticky;top:0;z-index:2}
+  .store-pane-table thead th{background:var(--print-th-bg)}
+  body.dark-mode .store-pane-table thead th{background:var(--bg-card);color:var(--alert-info-border);border-bottom-color:var(--border-muted)}
+  .store-pane-table th{background:var(--print-th-bg);padding:10px;text-align:left;border-bottom:2px solid var(--border-muted);font-weight:600;}
+  .store-pane-table td{padding:8px 10px;border-bottom:1px solid var(--print-border);}
+  .store-pane-table tr:hover{background:var(--info-06);}
+  .store-pane-table tr:nth-child(even){background:var(--info-06);}
+  .collapse-toggle{background:var(--help-btn-bg);border:1px solid var(--help-btn-border);color:var(--help-btn-color);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px;}
+    .chev{display:inline-block;transition:transform .2s ease;}
+    .collapsed .chev{transform:rotate(-90deg);}
+    .collapsed .store-pane-body{display:none;}
+    /* Light mode: highlighter-style rows on white (green/yellow) */
+  .store-pane-table tr.redistributed-row{background:var(--success-20)!important;}
+  .store-pane-table tr.manual-row{background:var(--warning-20)!important;}
+    /* Light mode badges (green/yellow) */
+  .delta-badge{display:inline-block;margin-left:8px;padding:2px 8px;font-size:11px;border-radius:9999px;font-weight:700;background:var(--delta-auto-bg);border:1px solid var(--delta-auto-border);color:var(--delta-auto-text);line-height:1.4;vertical-align:middle;}
+  .delta-badge.auto{background:var(--delta-auto-bg);border:1px solid var(--delta-auto-border);color:var(--delta-auto-text);}
+  .delta-badge.manual{background:var(--delta-manual-bg);border:1px solid var(--delta-manual-border);color:var(--delta-manual-text);}
+  .legend-note{font-size:12px;color:var(--success-2);margin:8px 0 -4px 0;}
+    #fullResultsSection{background:transparent;padding:clamp(16px,1.8vw,28px);margin-top:0;}
+    .results-shell{max-width:min(1600px,96vw);margin:0 auto;background:transparent;border-radius:15px;box-shadow:none;padding:clamp(16px,2vw,32px);}    
+  #helpOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--overlay-backdrop);z-index:10000;align-items:center;justify-content:center;}
+    .help-content{background:var(--light);border-radius:12px;padding:30px;max-width:600px;max-height:80vh;overflow-y:auto;margin:20px;position:relative;color:var(--ink-1);}
+  .help-close{position:absolute;top:15px;right:15px;background:none;border:none;font-size:24px;cursor:pointer;color:var(--muted);}
+  .toast{position:fixed;right:16px;bottom:16px;background:var(--toast-bg);color:var(--toast-text);padding:10px 14px;border-radius:8px;font-size:13px;box-shadow:0 8px 20px var(--overlay-shadow);opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .2s ease,transform .2s ease;z-index:9999;}
+    .toast.show{opacity:1;transform:translateY(0);}
+  .toast-light{background:var(--toast-light-bg);color:var(--toast-text);border:1px solid var(--toast-light-border);}
+    /* Accessible focus */
+    :focus-visible{outline:2px solid var(--pink-1);outline-offset:2px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,1,1);white-space:nowrap;border:0}
+    /* App animations */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeOutDown{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(8px)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes popIn{0%{transform:scale(.9);opacity:0}60%{transform:scale(1.03);opacity:1}100%{transform:scale(1)}}
+  @keyframes flashBg{0%{box-shadow:0 0 0 0 var(--flash-accent-start)}30%{box-shadow:0 0 0 3px var(--flash-accent-peak)}100%{box-shadow:0 0 0 0 var(--flash-accent-start)}}
+    .update-flash{animation:flashBg .8s ease}
+    .queue-item{animation:fadeInUp .25s ease both}
+    .queue-item.removing{animation:fadeOutDown .2s ease both}
+    .store-pane{animation:fadeIn .25s ease both}
+    .store-pane-body{animation:fadeInUp .25s ease both}
+    .store-pane-body tbody tr{animation:fadeIn .2s ease both}
+    .delta-badge{animation:popIn .35s ease}
+    /* Floating Go-To-Top button */
+    .back-to-top{position:fixed;right:28px;bottom:80px;width:44px;height:44px;border-radius:9999px;border:none;cursor:pointer;
+  background:var(--gradient-primary);color:var(--text-inverse);font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow-2);opacity:0;pointer-events:none;transform:translateY(10px) scale(.96);
+      transition:opacity .2s ease, transform .2s ease, box-shadow .2s ease;z-index:9998}
+    .back-to-top.show{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+  .back-to-top:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px) scale(1.02)}
+    body.dark-mode .back-to-top{background:var(--gradient-primary)}
+  body.dark-mode{background:var(--gradient-dark);color:var(--text-inverse);}  
+  body.dark-mode .container{background:transparent;color:var(--text-inverse);} 
+  body.dark-mode .card{background:var(--bg-card);border-color:var(--border-muted);color:var(--text-inverse);}
+  body.dark-mode .card h3{color:var(--alert-info-border);} 
+  body.dark-mode .store-item{background:var(--bg-secondary);color:var(--text-inverse);} 
+  body.dark-mode .store-item .name{color:var(--text-inverse);} 
+  body.dark-mode .queue-item{background:var(--bg-secondary);color:var(--text-inverse);} 
+  body.dark-mode .queue-item .details{color:var(--alert-info-border);}    
+    body.dark-mode .import-tabs{background:var(--bg-card);}    
+    body.dark-mode .import-tab{color:var(--text-inverse);}    
+    body.dark-mode .import-tab.active{background:var(--pink-1);color:var(--text-inverse);}    
+    body.dark-mode .upload-area{background:var(--bg-card);border-color:var(--border-muted);}    
+    body.dark-mode .upload-area:hover{background:var(--bg-secondary);}    
+    body.dark-mode input,body.dark-mode select,body.dark-mode textarea{background:var(--bg-input);color:var(--text-inverse);border-color:var(--border-muted);}    
+    body.dark-mode ::placeholder{color:var(--muted);}    
+    body.dark-mode #fullResultsSection{background:transparent;}    
+    body.dark-mode .results-shell{background:transparent;color:var(--text-inverse);}    
+  body.dark-mode .results-title{background:var(--bg-card);color:var(--text-inverse);border:1px solid var(--border-muted);box-shadow:var(--shadow-xs)} 
+  body.dark-mode .results-shell h2{color:var(--alert-info-border);}    
+    body.dark-mode .store-pane{background:var(--bg-card);border-color:var(--border-muted);}    
+    body.dark-mode .store-pane-header{background:var(--bg-card);}    
+
+    /* Force specific Allocation Buddy sections to use the unified dark card surface
+       (Store Management, Import Data, Import Queue, Actions) */
+    body.dark-mode .sidebar .card,
+    body.dark-mode .main-area .card,
+    body.dark-mode .import-content,
+    body.dark-mode .import-tabs,
+    body.dark-mode .store-pane,
+    body.dark-mode .store-pane-body,
+    body.dark-mode .store-pane-actions,
+    body.dark-mode .queue-item,
+    body.dark-mode #devStoresList,
+    body.dark-mode .dev-store-row {
+      background: var(--bg-card);
+      color: var(--text-inverse);
+      border-color: var(--border-muted);
+      box-shadow: var(--shadow-1);
+    }
+    body.dark-mode .store-pane-header.copied-collapsed{background:var(--gradient-success);}  
+  body.dark-mode .store-pane-table th{background:var(--bg-card);color:var(--alert-info-border);border-bottom-color:var(--border-muted);}    
+    body.dark-mode .store-pane-table td{border-bottom-color:var(--border-muted);color:var(--text-inverse);}    
+    body.dark-mode .store-pane-table tr:hover{background:var(--bg-card);}    
+  body.dark-mode .store-pane-table tr:nth-child(even){background:var(--bg-secondary);}    
+    body.dark-mode .store-pane-table tr.redistributed-row{background:var(--success-06)!important;}    
+    body.dark-mode .store-pane-table tr.manual-row{background:var(--warning-06)!important;}    
+    body.dark-mode .delta-badge{background:var(--success-06);border-color:var(--success-border);color:var(--success-2);}    
+    body.dark-mode .delta-badge.auto{background:var(--success-06);border-color:var(--success-border);color:var(--success-2);}    
+    body.dark-mode .delta-badge.manual{background:var(--warning-06);border-color:var(--warning-border);color:var(--warning-text);}    
+    body.dark-mode .legend-note{color:var(--success-2);}    
+    body.dark-mode .store-pane-actions{background:var(--bg-card);border-top-color:var(--border-muted);}    
+
+      /* Dark-mode contrast overrides moved to theme.css (consolidated for all pages) */
+    body.dark-mode .simple-alert{color:var(--text-inverse);}    
+  body.dark-mode .alert-info{background:var(--alert-info-bg);border-color:var(--alert-info-border);color:var(--alert-info-border);}
+    body.dark-mode #resultsContainer .alert-info > strong{display:none;}
+  body.dark-mode .alert-success{background:var(--alert-info-bg);border-color:var(--success-border);color:var(--success-20);} 
+  body.dark-mode .alert-warning{background:var(--alert-info-bg);border-color:var(--warning-border);color:var(--warning-20);} 
+  body.dark-mode .alert-danger{background:var(--alert-info-bg);border-color:var(--danger);color:var(--alert-info-border);} 
+  body.dark-mode .copy-btn{background:var(--bg-input);color:var(--alert-info-border);border:1px solid var(--border-muted);}
+  body.dark-mode .copied-badge{background:var(--copied-badge-bg);border-color:var(--copied-badge-border);color:var(--copied-badge-text);}
+    body.dark-mode .collapse-toggle{background:var(--bg-input);border-color:var(--border-muted);color:var(--text-inverse);}
+    body.dark-mode .help-content{background:var(--bg-card);color:var(--text-inverse);}
+  body.dark-mode .help-close{color:var(--alert-info-border);} 
+    /* Dev overlay: dark mode adjustments */
+    body.dark-mode #devOverlay .help-content{background:var(--bg-card);color:var(--text-inverse);}
+  body.dark-mode #devOverlay h2, body.dark-mode #devOverlay h3{color:var(--alert-info-border);} 
+    body.dark-mode #devStoresList{background:var(--bg-card) !important; border-color:var(--border-muted) !important;}
+    body.dark-mode .dev-store-row{background:var(--bg-card) !important; border-color:var(--border-muted) !important;}
+    body.dark-mode #devStoresList label{color:var(--muted) !important;}
+    body.dark-mode #devStoresList .remove-btn{background:var(--bg-input) !important; border-color:var(--border-muted) !important; color:var(--danger) !important;}
+    /* Dark mode: Column Mapping preview */
+    body.dark-mode .colmap-preview{background:var(--bg-card) !important; border:1px solid var(--border-muted) !important;}
+    body.dark-mode .colmap-table{color:var(--text-inverse);}
+    body.dark-mode .colmap-table tr{border-bottom:1px solid var(--border-muted) !important;}
+    body.dark-mode .colmap-table td{background:var(--bg-secondary) !important;}
+    body.dark-mode .colmap-table td.colmap-index{background:var(--bg-card) !important;}
+  body.dark-mode .colmap-heading{color:var(--alert-info-border);}    
+    body.dark-mode .colmap-note{color:var(--muted) !important;}
+    /* Dark mode: improve Sorting Results title legibility */
+  body.dark-mode .results-header-band{background:var(--bg-card);color:var(--text-inverse);border:1px solid var(--border-muted);box-shadow:var(--shadow-md)} 
+  body.dark-mode .results-header-title{color:var(--text-inverse);text-shadow:0 1px 2px var(--overlay-shadow);} 
+    /* Dark mode: buttons also match highlight colors */
+  body.dark-mode #distributeBtn{background:var(--success-2);color:var(--text-inverse);border:1px solid var(--success-border);box-shadow:var(--shadow-sm);} 
+  body.dark-mode #distributeBtn:hover{box-shadow:var(--shadow-md);} 
+  body.dark-mode #manualAssignBtn{background:var(--warning-20);color:var(--warning-text);border:1px solid var(--warning-border);box-shadow:var(--shadow-sm);} 
+  body.dark-mode #manualAssignBtn:hover{box-shadow:var(--shadow-md);} 
+    
+    @media (max-width:1400px){
+      .dashboard{grid-template-columns:clamp(140px,38vw,320px) 1fr;}
+    }
+    @media (max-width:1100px){
+      .dashboard{grid-template-columns:1fr;}
+      .sidebar,.main-area{gap:clamp(10px,2vw,20px);}
+      .card{padding:clamp(8px,2vw,14px);}
+      .big-button{padding:clamp(6px,2vw,10px) clamp(8px,3vw,14px);}
+    }
+    @media (max-width:900px){
+      .store-pane-body{max-height:none;}
+      .dashboard{padding:clamp(6px,2vw,14px);}
+      .header, header{padding:clamp(8px,2vw,14px);}
+      .container{padding:clamp(6px,2vw,12px);}
+    }
+    @media (max-width:600px){
+      .dashboard{gap:clamp(6px,2vw,10px);}
+      .card{padding:clamp(6px,2vw,10px);}
+      .big-button{font-size:clamp(12px,3vw,14px);padding:clamp(6px,2vw,10px) clamp(6px,3vw,12px);}
+      .title strong{font-size:clamp(1rem,4vw,1.2rem);}
+      .header, header{padding:clamp(6px,2vw,10px);}
+    }
+  /* Header card separation moved to theme.css */
+  /* Main content wrapper for header and dashboard alignment */
+  .dashboard-header {
+    grid-column: 1 / -1;
+    margin-bottom: 24px;
+  }
+  .main-content {
+    max-width: min(1600px,96vw);
+    margin: 0 auto;
+    padding-left: clamp(16px,1.8vw,28px);
+    padding-right: clamp(16px,1.8vw,28px);
+  }
+  
+  /* Match header padding to dashboard padding for visual alignment */
+  .site-header{
+    padding: 18px clamp(16px,1.8vw,28px);
+  }
+  </style>
+  </head>
+  <body class="dark-mode">
+    <div class="container">
+      <div class="main-content">
+        <div class="dashboard">
+          <div class="dashboard-back-row" style="grid-column: 1 / -1; margin-bottom: 8px;">
+            <button onclick="window.location.href='app_splash_screen.html'" class="big-button mt-12">← Back to Splash Screen</button>
+          </div>
+          <div class="header-card dashboard-header">
+            <header class="site-header" role="banner" aria-label="Allocation Buddy header">
+              <div class="site-header-left" style="display:flex;align-items:center;gap:12px;">
+                <div class="app-icon" aria-hidden="true">📦</div>
+                <div>
+                  <div class="title"><strong>Allocation Buddy</strong></div>
+                  <div class="pill" style="font-size:0.95rem;color:var(--text-secondary)">Compact dashboard for sorting inventory by store destination</div>
+                </div>
+              </div>
+
+              <div class="site-header-right" style="display:flex;align-items:center;gap:12px;">
+                <div class="help-button" role="button" tabindex="0" aria-label="Show help">
+                  <button onclick="showHelpOverlay()" title="Show help guide">❓ Help</button>
+                </div>
+                <label class="theme-switch" title="Toggle theme" aria-label="Toggle theme">
+                  <input type="checkbox" id="themeToggle" aria-checked="false" />
+                  <span class="switch-slider">
+                    <span class="switch-knob"></span>
+                  </span>
+                </label>
+              </div>
+            </header>
+          </div>
+      <div class="sidebar">
+        <div class="card">
+          <h3>🏪 Store Management</h3>
+          <div class="import-tabs">
+            <button class="import-tab active" onclick="switchTab('store','manage')">📋 Manage Stores</button>
+            <button class="import-tab" onclick="switchTab('store','add')">➕ Add Store</button>
+          </div>
+
+          <div class="import-content active" id="manage-content">
+            <div style="display:flex;justify-content:space-between;margin-bottom:15px;font-size:14px;">
+              <span>Active: <strong id="activeStoreCount">0</strong></span>
+              <span>Inactive: <strong id="inactiveStoreCount">0</strong></span>
+              <div>
+                <button class="big-button" onclick="toggleAllStores(true)">All</button>
+                <button class="big-button" onclick="toggleAllStores(false)">None</button>
+              </div>
+            </div>
+            <div class="store-list" id="storeStatusContainer"></div>
+          </div>
+
+          <div class="import-content" id="add-content">
+            <div class="add-store">
+              <input type="text" id="newStoreCode" placeholder="Store Code"/>
+              <input type="text" id="newStoreName" placeholder="Store Name"/>
+              <select id="newStoreRank">
+                <option value="AA">AA - Above A</option>
+                <option value="A">A - High</option>
+                <option value="B" selected>B - Medium</option>
+                <option value="C">C - Low</option>
+              </select>
+              <label style="display:flex;align-items:center;gap:8px;font-size:14px;">
+                <input type="checkbox" id="newStoreActive" checked/> Start as active
+              </label>
+              <button class="big-button success" onclick="addNewStore()">Add Store</button>
+
+              <!-- New: Re-add default stores button -->
+              <button class="big-button warning mt-10" onclick="restoreDefaults()">
+                Re-Add Default Stores
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="main-area">
+        <div class="stats-row">
+          <div class="stat-card"><span class="stat-value" id="itemCount">0</span><div class="stat-label">Items to Sort</div></div>
+          <div class="stat-card"><span class="stat-value" id="storeDestinationCount">0</span><div class="stat-label">Destinations</div></div>
+          <div class="stat-card"><span class="stat-value" id="activeStoreCount2">0</span><div class="stat-label">Active Stores</div></div>
+          <div class="stat-card"><span class="stat-value" id="totalProcessed">0</span><div class="stat-label">Processed</div></div>
+        </div>
+
+        <div class="card">
+          <h3>📤 Import Data</h3>
+          <div class="import-tabs">
+            <button class="import-tab active" onclick="switchTab('import','upload')">📄 Upload Excel</button>
+            <button class="import-tab" onclick="switchTab('import','paste')">📋 Paste Data</button>
+          </div>
+
+          <div class="import-content active" id="upload-content">
+            <div class="upload-area" id="uploadArea">
+              <h4>Upload Excel File</h4>
+              <p class="" style="font-size:14px;color:var(--muted);margin:10px 0;">Choose Excel files (.xlsx, .xls, .xlsm)</p>
+              <p class="" style="font-size:12px;color:var(--muted);margin:5px 0;">✨ Supports store codes OR store names</p>
+              <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm" onchange="handleFileUpload(event)" class="hidden"/>
+              <button class="big-button" onclick="document.getElementById('fileInput').click()">Choose File</button>
+              <label class="mt-10" style="display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;color:var(--muted)">
+                <input type="checkbox" id="combineToggle" checked/> Combine duplicate item-store lines on import
+              </label>
+              <div id="fileStatus" style="font-size:12px;margin-top:10px;"></div>
+            </div>
+          </div>
+
+          <div class="import-content" id="paste-content">
+            <div style="text-align:center;margin-bottom:15px;">
+              <h4>Paste Data</h4>
+              <p style="font-size:14px;color:var(--muted);margin:5px 0;">Copy from Excel and paste below</p>
+              <p style="font-size:12px;color:var(--muted);">Format: ItemNumber, Quantity, StoreCode/StoreName</p>
+            </div>
+            <textarea id="pasteArea" placeholder="Example:&#10;NSN-0402-21, 10, 101&#10;NSN-0405-04, 20, NIAGARA 1&#10;NSN-0405-05, 15, MISSISSAUGA" class="full-width textarea-mono"></textarea>
+              <label class="mt-8" style="display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;color:var(--muted)">
+              <input type="checkbox" id="combineToggle2" checked/> Combine duplicate item-store lines on import
+            </label>
+            <button class="big-button success full-width mt-8" onclick="processPastedData()">Process Data</button>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>📦 Import Queue</h3>
+            <div class="queue" id="importContainer">
+              <div class="simple-alert alert-info">No items imported yet.</div>
+            </div>
+            <button class="big-button danger hidden mt-10" onclick="clearImport()" id="clearBtn">Clear All</button>
+          </div>
+
+          <div class="card">
+            <h3>🚀 Actions</h3>
+            <div id="sortingStatus" class="mb-10"></div>
+            <button class="big-button success large full-width mb-10" onclick="sortItems()">Sort by Store</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <button class="big-button" onclick="exportResults()">Export</button>
+              <button class="big-button warning" onclick="startOver()">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="fullResultsSection" class="hidden">
+      <div class="results-shell">
+        <div class="results-header-band">
+          <h2 class="results-header-title">
+            <span class="step-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 7V17 M10 17 L7 14 M10 17 L13 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 17V7 M14 7 L11 10 M14 7 L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            Sorting Results
+          </h2>
+        </div>
+      <div id="resultsStatus" style="margin-bottom:10px;"></div>
+      <div id="issuesContainer" class="hidden"></div>
+      <div id="resultsContainer"></div>
+    </div>
+  </div>
+
+  <!-- Help Overlay -->
+  <div id="helpOverlay" class="hidden">
+    <div class="help-content">
+      <button onclick="hideHelpOverlay()" class="help-close">×</button>
+      
+      <h2 style="color:var(--pink-1);margin-bottom:20px;">📚 Allocation Buddy Help</h2>
+      
+      <div style="line-height:1.6;">
+        <h3 style="color:var(--pink-1);margin:20px 0 10px 0;">🏪 Store Management</h3>
+        <p>Manage your store list with codes, names, and priority ranks (AA=Above A, A=High, B=Medium, C=Low). Toggle stores active/inactive and add new stores as needed.</p>
+        
+        <h3 style="color:var(--pink-1);margin:20px 0 10px 0;">📤 Import Data</h3>
+        <p><strong>Excel Upload:</strong> Upload .xlsx/.xls files with Item, Quantity, and Store columns. Auto-detects headers and supports both store codes and store names.</p>
+        <p><strong>Paste Data:</strong> Copy from Excel and paste. Format: ItemNumber, Quantity, StoreCode/StoreName (comma or tab separated).</p>
+        
+        <h3 style="color:var(--pink-1);margin:20px 0 10px 0;">🚀 Sort & Distribute</h3>
+        <p><strong>Sort by Store:</strong> Organizes items by destination and identifies issues (inactive stores, missing stores).</p>
+        <p><strong>Manual Assign Selected → Re-Sort:</strong> For each problem row, choose a target store from the dropdown, then apply and re-sort.</p>
+        <p><strong>Auto-Distribute Problems → Active (by Rank):</strong> Automatically redistributes items from inactive or unknown stores to active ones using rank-weighted distribution.</p>
+        
+        <h3 style="color:var(--pink-1);margin:20px 0 10px 0;">📋 Copy & Export</h3>
+        <p><strong>Copy Store Items:</strong> Click 📋 Copy to copy item lists (Tab-separated). Hold Alt for CSV format.</p>
+        <p><strong>Export:</strong> Download complete results as Excel file with separate sheets for stores and issues.</p>
+        
+        <h3 style="color:var(--pink-1);margin:20px 0 10px 0;">🌙 Features</h3>
+        <p>• Dark/Light mode toggle<br>• Collapsible store sections<br>• Real-time validation<br>• Rank-weighted redistribution<br>• Automatic store detection by code or name</p>
+        
+        <div class="pro-tip">
+          <strong>💡 Pro Tip:</strong> Items assigned to inactive or unknown stores will be flagged. Use "Distribute Problem → Active" to automatically reallocate them based on store priority ranks.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dev Overlay (hidden) -->
+  <div id="devOverlay" class="hidden" style="position:fixed;inset:0;background:var(--overlay-backdrop);z-index:10050;align-items:center;justify-content:center;">
+    <div class="help-content" style="max-width:900px; width:min(92vw,900px);">
+      <button onclick="hideDevOverlay()" class="help-close" aria-label="Close">&times;</button>
+      <h2 style="color:var(--pink-1);margin-bottom:12px;">Developer Settings</h2>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Adjust app defaults. Changes persist in localStorage.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <h3 style="color:var(--pink-1);margin-bottom:6px;">Rank Weights</h3>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:end;">
+            <label style="font-size:12px;">AA<br><input id="devWeightAA" type="number" min="0" step="1" class="full-width input-compact"></label>
+            <label style="font-size:12px;">A<br><input id="devWeightA" type="number" min="0" step="1" class="full-width input-compact"></label>
+            <label style="font-size:12px;">B<br><input id="devWeightB" type="number" min="0" step="1" class="full-width input-compact"></label>
+            <label style="font-size:12px;">C<br><input id="devWeightC" type="number" min="0" step="1" class="full-width input-compact"></label>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="big-button" onclick="devSaveWeights()">Save Weights</button>
+            <button class="big-button" onclick="devRestoreBuiltinWeights()">Restore Built-in</button>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="color:var(--pink-1);margin-bottom:6px;">Default Stores (List)</h3>
+          <div id="devStoresList" style="display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto;border:1px solid var(--border-muted);padding:8px;border-radius:8px;background:var(--bg-card);"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;">
+            <button class="big-button" onclick="devAddDefaultStore()">Add Store</button>
+            <button class="big-button" onclick="devSaveDefaultStores()">Save Defaults</button>
+            <button class="big-button" onclick="devApplyDefaultsToCurrent()">Replace Current Stores</button>
+            <button class="big-button" onclick="devLoadCurrentDefaults()">Reload Editor</button>
+            <button class="big-button" onclick="devClearSettings()">Reset Dev Settings</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">Each row requires code, name, rank (AA/A/B/C), and active.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="copyToast" class="toast">Copied!</div>
+  <div id="actionToast" class="toast" style="left:50%;transform:translate(-50%,10px);right:auto;bottom:24px;">Action done. <button id="undoBtn" class="copy-btn ml-8">Undo</button></div>
+  <div id="ariaStatus" class="sr-only" aria-live="polite"></div>
+
+  <!-- Go To Top Button -->
+  <button id="backToTopBtn" class="back-to-top" aria-label="Go to top" title="Go to top">↑</button>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div>
+      <strong>Allocation Buddy</strong> - Inventory Management System
+    </div>
+    <div style="margin-top:8px;font-size:12px;opacity:0.8;">
+      Copyright © 2025. All rights reserved. | Designed for efficient inventory allocation and distribution management.
+    </div>
+  </footer>
+
+  <script>
+    // Cache DOM elements
+    const $ = id => document.getElementById(id);
+    const $$ = sel => document.querySelector(sel);
+    const $$$ = sel => document.querySelectorAll(sel);
+    const escapeHtml = (value) => {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+    const getRankClass = (rank) => {
+      const normalized = String(rank ?? '').toLowerCase();
+      return ['aa','a','b','c'].includes(normalized) ? normalized : 'unknown';
+    };
+    
+    const normalizeDictionaryText = (value) => {
+      return String(value ?? '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ');
+    };
+    const normalizeStoreName = (value) => {
+      return String(value ?? '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ');
+    };
+
+    const GENERIC_STORE_TOKENS = new Set(['STORE', 'STORES', 'SHOP', 'SHOPPE', 'LOCATION', 'LOC', 'OUTLET', 'BRANCH', 'DEPARTMENT', 'DEPT']);
+
+        const dictionaryState = {
+      loadPromise: null,
+      ready: false,
+      items: [],
+      numberIndex: new Map(),
+      descIndex: new Map(),
+      descCompactIndex: new Map(),
+      entries: [],
+      stores: [],
+      storeEntries: [],
+      storeCodeIndex: new Map(),
+      storeNameIndex: new Map(),
+      storeNameNormalizedIndex: new Map(),
+      lastError: null
+    };
+
+        const loadDictionaryData = async () => {
+      try {
+        const mod = await import('./dictionaries.js');
+        return (mod && (mod.default || mod)) || {};
+      } catch (importErr) {
+        try {
+          const response = await fetch(new URL('./dictionaries.js', document.baseURI), { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error(('HTTP ' + response.status + ' ' + response.statusText).trim());
+          }
+          const source = await response.text();
+          let sanitized = source.replace(/export\s+default\s+dictionaries\s*;/, 'return dictionaries;');
+          if (sanitized === source) {
+            sanitized += '\nreturn typeof dictionaries !== "undefined" ? dictionaries : (typeof defaultExport !== "undefined" ? defaultExport : undefined);';
+          }
+          const loader = new Function(sanitized);
+          const result = loader();
+          if (!result) throw new Error('Fallback loader returned no data');
+          return result;
+        } catch (fallbackErr) {
+          const message = fallbackErr && fallbackErr.message ? fallbackErr.message : String(fallbackErr);
+          const combined = new Error('Unable to load dictionaries.js: ' + message);
+          combined.cause = importErr;
+          throw combined;
+        }
+      }
+    };
+
+        const ensureItemDictionaryLoaded = async () => {
+      if (dictionaryState.ready) return true;
+      if (!dictionaryState.loadPromise) {
+        dictionaryState.loadPromise = loadDictionaryData()
+          .then(mod => (mod && (mod.default || mod)) || {})
+          .then(dict => {
+            dictionaryState.lastError = null;
+            const items = Array.isArray(dict.items) ? dict.items : [];
+            dictionaryState.items = items;
+            dictionaryState.numberIndex = new Map();
+            dictionaryState.descIndex = new Map();
+            dictionaryState.descCompactIndex = new Map();
+            dictionaryState.entries = [];
+            items.forEach(item => {
+              const code = String(item?.number ?? '').toUpperCase().trim();
+              if (!code) return;
+              dictionaryState.numberIndex.set(code, code);
+              const descNormalized = normalizeDictionaryText(item?.desc ?? '');
+              if (descNormalized) {
+                if (!dictionaryState.descIndex.has(descNormalized)) {
+                  dictionaryState.descIndex.set(descNormalized, code);
+                }
+                const compact = descNormalized.replace(/\s+/g, '');
+                if (compact && !dictionaryState.descCompactIndex.has(compact)) {
+                  dictionaryState.descCompactIndex.set(compact, code);
+                }
+                const tokens = Array.from(new Set(descNormalized.split(' ').filter(Boolean)));
+                dictionaryState.entries.push({ code, desc: descNormalized, tokens });
+              } else {
+                dictionaryState.entries.push({ code, desc: '', tokens: [] });
+              }
+            });
+
+            const stores = Array.isArray(dict.stores) ? dict.stores : [];
+            dictionaryState.stores = stores;
+            dictionaryState.storeEntries = [];
+            dictionaryState.storeCodeIndex = new Map();
+            dictionaryState.storeNameIndex = new Map();
+            dictionaryState.storeNameNormalizedIndex = new Map();
+            stores.forEach(store => {
+              const rawCode = String(store?.id ?? store?.code ?? '').trim();
+              const name = String(store?.name ?? '').trim();
+              if (!rawCode || !name) return;
+              const cleanedCode = rawCode.replace(/^0+/, '') || rawCode;
+              const normalizedName = normalizeStoreName(name);
+              const tokens = normalizedName.split(' ').filter(Boolean);
+              const meaningfulTokens = tokens.filter(token => !GENERIC_STORE_TOKENS.has(token));
+              const entry = {
+                code: cleanedCode,
+                name,
+                nameUpper: name.toUpperCase(),
+                normalized: normalizedName,
+                tokens,
+                meaningfulTokens
+              };
+              dictionaryState.storeEntries.push(entry);
+              dictionaryState.storeCodeIndex.set(cleanedCode, entry);
+              dictionaryState.storeCodeIndex.set(rawCode, entry);
+              dictionaryState.storeNameIndex.set(entry.nameUpper, entry);
+              dictionaryState.storeNameNormalizedIndex.set(entry.normalized, entry);
+            });
+
+            dictionaryState.ready = true;
+            return true;
+          })
+          .catch(err => {
+            console.warn('Item dictionary failed to load:', err);
+            dictionaryState.ready = false;
+            dictionaryState.lastError = err;
+            throw err;
+          });
+      }
+      try {
+        await dictionaryState.loadPromise;
+        return dictionaryState.ready;
+      } catch (err) {
+        if (!dictionaryState.lastError) {
+          dictionaryState.lastError = err;
+        }
+        return false;
+      }
+    };
+
+    const fuzzyResolveItemCode = (normalizedValue) => {
+      if (!normalizedValue || !dictionaryState.entries.length) return null;
+      const tokens = Array.from(new Set(normalizedValue.split(' ').filter(token => token.length > 2)));
+      if (!tokens.length) return null;
+
+      let bestCode = null;
+      let bestScore = 0;
+
+      for (const entry of dictionaryState.entries) {
+        if (!entry.desc) continue;
+        let score = 0;
+        for (const token of tokens) {
+          if (entry.tokens.includes(token)) {
+            score += 3;
+          } else if (entry.desc.includes(token)) {
+            score += 1;
+          }
+        }
+        if (entry.desc === normalizedValue) score += 15;
+        if (entry.desc.startsWith(normalizedValue)) score += 5;
+        if (entry.desc.includes(normalizedValue)) score += 4;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestCode = entry.code;
+        }
+      }
+
+      return bestScore >= Math.max(6, tokens.length * 2) ? bestCode : null;
+    };
+
+    const resolveItemNumberFromDictionary = (rawValue, rowCells = [], options = {}) => {
+      const candidateRaw = String(rawValue ?? '').trim();
+      if (!candidateRaw) {
+        return { code: '', matched: false };
+      }
+
+      const candidateUpper = candidateRaw.toUpperCase();
+      if (dictionaryState.numberIndex.has(candidateUpper)) {
+        return { code: dictionaryState.numberIndex.get(candidateUpper), matched: true };
+      }
+
+      const firstToken = candidateUpper.split(/\s+/)[0];
+      if (dictionaryState.numberIndex.has(firstToken)) {
+        return { code: dictionaryState.numberIndex.get(firstToken), matched: true };
+      }
+
+      const normalized = normalizeDictionaryText(candidateRaw);
+      if (normalized && dictionaryState.descIndex.has(normalized)) {
+        return { code: dictionaryState.descIndex.get(normalized), matched: true };
+      }
+
+      if (normalized) {
+        const compactKey = normalized.replace(/\s+/g, '');
+        if (compactKey && dictionaryState.descCompactIndex.has(compactKey)) {
+          return { code: dictionaryState.descCompactIndex.get(compactKey), matched: true };
+        }
+      }
+
+      const ignoreColumns = Array.isArray(options.ignoreColumns) ? new Set(options.ignoreColumns) : new Set();
+      const ignoreRawValues = Array.isArray(options.ignoreValues) ? options.ignoreValues : [];
+      const ignoreNormalizedValues = new Set(ignoreRawValues
+        .map(value => normalizeDictionaryText(String(value ?? '')))
+        .filter(Boolean));
+      if (rowCells && rowCells.length) {
+        for (let cellIdx = 0; cellIdx < rowCells.length; cellIdx++) {
+          if (ignoreColumns.has(cellIdx)) continue;
+          const cell = rowCells[cellIdx];
+          if (!cell || cell === rawValue) continue;
+          const cellStr = String(cell).trim();
+          if (!cellStr) continue;
+          const normalizedCell = normalizeDictionaryText(cellStr);
+          if (!normalizedCell || ignoreNormalizedValues.has(normalizedCell)) continue;
+          if (dictionaryState.descIndex.has(normalizedCell)) {
+            return { code: dictionaryState.descIndex.get(normalizedCell), matched: true };
+          }
+          const compactCell = normalizedCell.replace(/\\s+/g, '');
+          if (compactCell && dictionaryState.descCompactIndex.has(compactCell)) {
+            return { code: dictionaryState.descCompactIndex.get(compactCell), matched: true };
+          }
+        }
+      }
+      return { code: candidateUpper, matched: false };
+    };
+    const resolveStoreFromDictionary = (identifier) => {
+      if (!dictionaryState.ready) return null;
+      const raw = String(identifier ?? '').trim();
+      if (!raw) return null;
+      const numeric = raw.replace(/^0+/, '') || raw;
+      if (dictionaryState.storeCodeIndex.has(numeric)) return dictionaryState.storeCodeIndex.get(numeric);
+      if (dictionaryState.storeCodeIndex.has(raw)) return dictionaryState.storeCodeIndex.get(raw);
+      const upper = raw.toUpperCase();
+      if (dictionaryState.storeNameIndex.has(upper)) return dictionaryState.storeNameIndex.get(upper);
+      const normalized = normalizeStoreName(raw);
+      if (!normalized) return null;
+      if (dictionaryState.storeNameNormalizedIndex.has(normalized)) return dictionaryState.storeNameNormalizedIndex.get(normalized);
+      const normalizedTokens = normalized.split(' ').filter(Boolean);
+      const meaningfulTokens = normalizedTokens.filter(token => !GENERIC_STORE_TOKENS.has(token));
+      const normalizedTokenSet = new Set(normalizedTokens);
+      const meaningfulTokenSet = new Set(meaningfulTokens);
+
+      if (normalized.length > 3) {
+        const entry = dictionaryState.storeEntries.find(entry => {
+          if (!entry) return false;
+          if (entry.normalized.includes(normalized) || normalized.includes(entry.normalized)) return true;
+          const entryTokens = entry.tokens || [];
+          const entryMeaningfulTokens = entry.meaningfulTokens?.length ? entry.meaningfulTokens : entryTokens;
+          if (entryMeaningfulTokens.length && meaningfulTokens.length) {
+            const entryMeaningfulSet = new Set(entryMeaningfulTokens);
+            const entryInInput = entryMeaningfulTokens.every(token => meaningfulTokenSet.has(token));
+            if (entryInInput) return true;
+            const inputInEntry = meaningfulTokens.every(token => entryMeaningfulSet.has(token));
+            if (inputInEntry) return true;
+          }
+          if (entryTokens.length && normalizedTokens.length) {
+            const entryTokenSet = new Set(entryTokens);
+            const entryTokensInInput = entryTokens.every(token => normalizedTokenSet.has(token));
+            if (entryTokensInInput) return true;
+          }
+          return false;
+        });
+        if (entry) return entry;
+      }
+      return null;
+    };
+
+    // Constants
+    const DEV_SETTINGS_KEY = 'allocationBuddyDevSettingsV1';
+    const BUILTIN_RANK_WEIGHTS = { AA: 4, A: 3, B: 2, C: 1 };
+    let RANK_WEIGHTS = { ...BUILTIN_RANK_WEIGHTS };
+    const COOKIE_NAME = 'allocationBuddyPrefs';
+    const COOKIE_DAYS = 365;
+    const APP_STATE_KEY = 'allocationBuddyStateV1';
+
+    // ---------- Defaults & helpers ----------
+    const DEFAULT_STORES = Object.freeze([
+      {code:'101',name:'WATERLOO 1',rank:'C',active:true},
+      {code:'102',name:'KITCHENER 1',rank:'B',active:true},
+      {code:'103',name:'CAMBRIDGE',rank:'B',active:true},
+      {code:'104',name:'LONDON 1',rank:'B',active:true},
+      {code:'105',name:'LONDON 2',rank:'B',active:true},
+      {code:'106',name:'HAMILTON 1',rank:'C',active:true},
+      {code:'107',name:'MISSISSAUGA',rank:'A',active:true},
+      {code:'108',name:'ST CATHARINES',rank:'B',active:true},
+      {code:'109',name:'HAMILTON 2',rank:'A',active:true},
+      {code:'110',name:'TORONTO 1',rank:'A',active:true},
+      {code:'111',name:'SCARBOROUGH',rank:'A',active:true},
+      {code:'112',name:'WINDSOR 1',rank:'A',active:true},
+      {code:'114',name:'TORONTO 2',rank:'A',active:true},
+      {code:'115',name:'KITCHENER 2',rank:'C',active:true},
+      {code:'116',name:'BRANTFORD',rank:'C',active:true},
+      {code:'117',name:'NIAGARA 1',rank:'B',active:false},
+      {code:'118',name:'BURLINGTON',rank:'A',active:true},
+      {code:'119',name:'LONDON 3',rank:'B',active:true},
+      {code:'120',name:'BARRIE 1',rank:'A',active:true},
+      {code:'121',name:'OSHAWA',rank:'A',active:true},
+      {code:'122',name:'BARRIE 2',rank:'A',active:true},
+      {code:'123',name:'GUELPH',rank:'B',active:true},
+      {code:'125',name:'TORONTO 3',rank:'A',active:true},
+      {code:'126',name:'NIAGARA 2',rank:'C',active:true},
+      {code:'127',name:'SARNIA',rank:'C',active:true},
+      {code:'128',name:'OTTAWA 1',rank:'C',active:true},
+      {code:'129',name:'OTTAWA 2',rank:'C',active:true},
+      {code:'130',name:'TORONTO 4',rank:'A',active:true},
+      {code:'131',name:'SUDBURY',rank:'B',active:true},
+      {code:'132',name:'WINDSOR 2',rank:'B',active:true},
+      {code:'133',name:'ST JOHNS',rank:'A',active:true},
+      {code:'134',name:'PETERBOROUGH',rank:'B',active:true},
+      {code:'135',name:'THUNDER BAY',rank:'A',active:true},
+      {code:'199',name:'STAG WEB',rank:'AA',active:true}
+    ]);
+
+    // Dev settings loader/saver
+    const loadDevSettings = () => {
+      try { const raw = localStorage.getItem(DEV_SETTINGS_KEY); return raw ? JSON.parse(raw) : {}; } catch (_) { return {}; }
+    };
+    const saveDevSettings = (settings) => {
+      try { localStorage.setItem(DEV_SETTINGS_KEY, JSON.stringify(settings || {})); } catch (_) {}
+    };
+
+    // Determine current default stores (dev override if present)
+    const getCurrentDefaultStores = () => {
+      const dev = loadDevSettings();
+      const ds = dev && Array.isArray(dev.defaultStores) ? dev.defaultStores : null;
+      return (ds && ds.length ? ds : DEFAULT_STORES);
+    };
+    const cloneDefaults = () => getCurrentDefaultStores().map(s => ({...s}));
+
+    // State
+    let itemsToSort = [];
+    let lastResults = null;
+    let redistributionDeltas = {};
+    let currentWorkbook = null;
+    const collapsedStores = {};
+    const copiedStores = {};
+    const manualAssignSelections = {}; // remember Assign-To dropdown choices
+    let allStores = cloneDefaults(); // start from defaults
+    let appStateLoaded = false;
+
+    // Virtualization settings and state
+    const IMPORT_CHUNK = 300;
+    const RESULTS_STORE_CHUNK = 50;
+    const RESULTS_ITEMS_CHUNK = 300;
+    let importRenderLimit = IMPORT_CHUNK;
+    let resultsStoreRenderLimit = RESULTS_STORE_CHUNK;
+    const expandedStoreItems = {}; // storeCode -> true when expanded
+
+    // Fast store lookups (O(1) by code or exact name)
+    const storeIndex = {
+      byCode: new Map(),
+      byNameUpper: new Map()
+    };
+    const rebuildStoreIndex = () => {
+      storeIndex.byCode.clear();
+      storeIndex.byNameUpper.clear();
+      allStores.forEach(s => {
+        s._codeNum = parseInt(String(s.code));
+        if (!Number.isFinite(s._codeNum)) s._codeNum = 999999;
+        storeIndex.byCode.set(String(s.code), s);
+        storeIndex.byNameUpper.set(String(s.name).toUpperCase(), s);
+      });
+    };
+
+    // Theme wiring: use centralized SSSuiteTheme API when available.
+    (function wireThemeToggle(){
+      try {
+        // If the shared theme helper is present, use it and register a change hook
+        if (window.SSSuiteTheme && typeof window.SSSuiteTheme.initTheme === 'function') {
+          // Persist app state when theme changes, and update legacy UI pieces
+          window.SSSuiteTheme.onChange = function(theme){
+            try {
+              const ts = document.getElementById('toggleSwitch');
+              if (ts) ts.classList.toggle('active', theme === 'dark');
+              const modeIcon = document.getElementById('modeIcon');
+              if (modeIcon) modeIcon.textContent = theme === 'dark' ? '🌙' : '☀️';
+            } catch(_) {}
+            try { saveAppState(); } catch(_) {}
+          };
+
+          // Ensure theme applied and toggles synced. theme.js will attach listeners to #themeToggle.
+          try { window.SSSuiteTheme.initTheme(); } catch(_) {}
+        } else {
+          // Fallback to legacy behavior if centralized API is not available
+          const t = document.getElementById('themeToggle');
+          if (!t) return;
+          t.checked = document.body.classList.contains('dark-mode');
+          t.addEventListener('change', (e) => {
+            const isDark = !!e.target.checked;
+            document.body.classList.toggle('dark-mode', isDark);
+            const modeIcon = document.getElementById('modeIcon');
+            if (modeIcon) modeIcon.textContent = isDark ? '🌙' : '☀️';
+            try { saveAppState(); } catch(_) {}
+          });
+        }
+      } catch(_) {}
+    })();
+    const getStoreByCode = code => storeIndex.byCode.get(String(code));
+    const getStoreByNameUpper = nameUpper => storeIndex.byNameUpper.get(String(nameUpper).toUpperCase());
+    // Initialize index on load
+    rebuildStoreIndex();
+
+    // Slide-in animation when opened from launcher
+    (function(){
+      try {
+        const dir = sessionStorage.getItem('launcherDirection');
+        if (dir) {
+          const cls = dir === 'left' ? 'slide-in-from-right' : 'slide-in-from-left';
+          try { document.querySelector('.container')?.classList.add(cls); } catch(_){}
+          try { sessionStorage.removeItem('launcherDirection'); } catch(_){}
+        }
+      } catch(_){}
+    })();
+
+    // Utilities
+    const setCookie = (name, value, days = COOKIE_DAYS) => {
+      const date = new Date();
+      date.setTime(date.getTime() + (days * 864e5));
+      document.cookie = `${name}=${encodeURIComponent(JSON.stringify(value))};expires=${date.toUTCString()};path=/;SameSite=Strict`;
+    };
+
+    const getCookie = name => {
+      const nameEQ = name + "=";
+      return document.cookie.split(';').reduce((acc, c) => {
+        const cookie = c.trim();
+        if (cookie.startsWith(nameEQ)) {
+          try { return JSON.parse(decodeURIComponent(cookie.substring(nameEQ.length))); }
+          catch(e) { return null; }
+        }
+        return acc;
+      }, null);
+    };
+
+    // ---------- Persistent App State (localStorage) ----------
+    const saveAppState = () => {
+      try {
+        const state = {
+          v: 1,
+          darkMode: document.body.classList.contains('dark-mode'),
+          allStores,
+          itemsToSort,
+          lastResults,
+          redistributionDeltas,
+          manualAssignSelections,
+          collapsedStores,
+          copiedStores
+        };
+        localStorage.setItem(APP_STATE_KEY, JSON.stringify(state));
+      } catch (e) {
+        // ignore quota or serialization errors
+      }
+    };
+
+    const loadAppState = () => {
+      try {
+        const raw = localStorage.getItem(APP_STATE_KEY);
+        if (!raw) return false;
+        const state = JSON.parse(raw);
+        if (!state || typeof state !== 'object') return false;
+
+        if (Array.isArray(state.allStores) && state.allStores.length > 0) {
+          allStores = state.allStores.map(s => ({...s}));
+        }
+        rebuildStoreIndex();
+
+        if (Array.isArray(state.itemsToSort)) itemsToSort = state.itemsToSort.map(x => ({...x}));
+        lastResults = state.lastResults || null;
+        redistributionDeltas = state.redistributionDeltas || {};
+        if (state.manualAssignSelections && typeof state.manualAssignSelections === 'object') {
+          Object.assign(manualAssignSelections, state.manualAssignSelections);
+        }
+
+        // Merge into existing objects
+        if (state.collapsedStores && typeof state.collapsedStores === 'object') Object.assign(collapsedStores, state.collapsedStores);
+        if (state.copiedStores && typeof state.copiedStores === 'object') Object.assign(copiedStores, state.copiedStores);
+
+        // Dark mode (from state)
+        if (typeof state.darkMode === 'boolean') {
+          document.body.classList.toggle('dark-mode', state.darkMode);
+          $('toggleSwitch').classList.toggle('active', state.darkMode);
+          $('modeIcon').textContent = state.darkMode ? '🌙' : '☀️';
+        }
+
+        // Reflect to UI
+        updateStoreStatus();
+        updateImportDisplay();
+        if (lastResults?.sortedStores?.length) {
+          const section = $('fullResultsSection');
+          section.classList.remove('hidden');
+          displayResults(lastResults);
+          $('totalProcessed').textContent = (lastResults.validItems?.length || 0) + (lastResults.issues?.length || 0);
+        }
+        updateDistributeButtonState();
+        appStateLoaded = true;
+        return true;
+      } catch (e) { return false; }
+    };
+
+    const clearAppState = () => {
+      try { localStorage.removeItem(APP_STATE_KEY); } catch(e) {}
+    };
+
+    const getCodeNumFromObj = (obj) => {
+      if (!obj) return 999999;
+      if (Object.prototype.hasOwnProperty.call(obj, '_codeNum')) return obj._codeNum;
+      const codeLike = obj.code ?? obj.storeCode;
+      const n = parseInt(String(codeLike));
+      return Number.isFinite(n) ? n : 999999;
+    };
+    const sortStoresNumerically = arr => arr.slice().sort((a, b) => getCodeNumFromObj(a) - getCodeNumFromObj(b));
+
+        const findStoreByCodeOrName = identifier => {
+      if (!identifier) return null;
+      const searchStr = String(identifier).trim();
+      if (!searchStr) return null;
+      let store = getStoreByCode(searchStr);
+      if (store) return store;
+      const stripped = searchStr.replace(/^0+/, '');
+      if (stripped !== searchStr) {
+        store = getStoreByCode(stripped);
+        if (store) return store;
+      }
+      const upper = searchStr.toUpperCase();
+      store = getStoreByNameUpper(upper);
+      if (store) return store;
+      if (dictionaryState.ready) {
+        const dictEntry = resolveStoreFromDictionary(searchStr);
+        if (dictEntry) {
+          store = getStoreByCode(dictEntry.code);
+          if (store) return store;
+          store = {
+            code: dictEntry.code,
+            name: dictEntry.name,
+            rank: 'B',
+            active: true
+          };
+          allStores.push(store);
+          rebuildStoreIndex();
+          return store;
+        }
+      }
+      for (const s of storeIndex.byNameUpper.values()) {
+        if (String(s.name).toUpperCase().includes(upper)) return s;
+      }
+      return null;
+    };
+
+    const showStatus = (html, type = 'info') => {
+      const alertClass = `alert-${type}`;
+      const block = `<div class="simple-alert ${alertClass}">${html}</div>`;
+      const statusElements = [$('sortingStatus'), $('resultsStatus')].filter(Boolean);
+      statusElements.forEach(el => el.innerHTML = block);
+    };
+
+    const saveUserPreferences = () => {
+      try {
+        // Persist core app state to centralized storage
+        try { saveAppState(); } catch(_) {}
+
+        // Maintain legacy cookie-based preferences for external integrations
+        const preferences = {
+          darkMode: document.body.classList.contains('dark-mode'),
+          storeStates: allStores.map(s => ({code: s.code, active: s.active}))
+        };
+        try { setCookie(COOKIE_NAME, preferences); } catch(_) {}
+      } catch(e) {}
+    };
+
+    const getActiveImportTab = () => {
+      const activeTab = $('.main-area .import-tab.active')?.textContent;
+      if (activeTab?.includes('Upload')) return 'upload';
+      if (activeTab?.includes('Paste')) return 'paste';
+      if (activeTab?.includes('How to Use')) return 'info';
+      return 'upload';
+    };
+
+    const loadUserPreferences = () => {
+      const prefs = getCookie(COOKIE_NAME);
+      if (!prefs) return;
+
+      // Dark mode
+      if (prefs.darkMode !== undefined) {
+        const isDark = prefs.darkMode;
+        document.body.classList.toggle('dark-mode', isDark);
+        $('toggleSwitch').classList.toggle('active', isDark);
+        $('modeIcon').textContent = isDark ? '🌙' : '☀️';
+      }
+
+      // Store states (only apply active flags if they match existing codes)
+      if (!appStateLoaded && Array.isArray(prefs.storeStates)) {
+        const codes = new Set(allStores.map(s => s.code));
+        prefs.storeStates.forEach(savedStore => {
+          if (codes.has(savedStore.code)) {
+            const store = getStoreByCode(savedStore.code);
+            if (store) store.active = !!savedStore.active;
+          }
+        });
+      }
+
+      // Do not restore tabs from preferences; keep HTML defaults
+    };
+
+    // Help functions
+    const showHelpOverlay = () => {
+      $('helpOverlay').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    };
+
+    const hideHelpOverlay = () => {
+      $('helpOverlay').style.display = 'none';
+      document.body.style.overflow = 'auto';
+    };
+
+    // ---------- Dev Overlay (hidden trigger in Help) ----------
+    const openDevFromHelp = (e) => { try { if (typeof showDevOverlay === 'function') showDevOverlay(); } catch(_){} };
+
+    const devStoreRowHTML = (idx, s = {code:'', name:'', rank:'B', active:true}) => {
+      const id = (p) => `devStore_${p}_${idx}`;
+      const esc = (v) => escapeHtml(v);
+      return `
+        <div class="dev-store-row" data-index="${idx}" style="display:grid;grid-template-columns:90px 1fr 90px 80px 32px;gap:6px;align-items:center;background:var(--light);border:1px solid var(--border-muted);padding:6px;border-radius:6px;">
+          <input id="${id('code')}" placeholder="Code" value="${esc(s.code)}" class="input-compact" />
+          <input id="${id('name')}" placeholder="Name" value="${esc(s.name)}" class="input-compact" />
+          <select id="${id('rank')}" class="input-compact">
+            ${['AA','A','B','C'].map(r => `<option value="${r}" ${String(s.rank).toUpperCase()===r?'selected':''}>${r}</option>`).join('')}
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;justify-content:center;font-size:12px;color:var(--muted);">
+            <input id="${id('active')}" type="checkbox" ${s.active ? 'checked' : ''}/> Active
+          </label>
+          <button class="remove-btn square" title="Remove" aria-label="Remove store" onclick="devRemoveDefaultStore(${idx})">&times;</button>
+        </div>`;
+    };
+    const devRenderStoresList = (stores) => {
+      const root = $('devStoresList');
+      if (!root) return;
+      const arr = Array.isArray(stores) ? stores : [];
+      root.innerHTML = arr.map((s,i) => devStoreRowHTML(i,s)).join('');
+    };
+    const devLoadCurrentDefaults = () => {
+      try {
+        const ds = getCurrentDefaultStores();
+        devRenderStoresList(ds);
+        // Fill weights
+        if ($('devWeightAA')) $('devWeightAA').value = Number(RANK_WEIGHTS.AA ?? 0);
+        if ($('devWeightA'))  $('devWeightA').value  = Number(RANK_WEIGHTS.A  ?? 0);
+        if ($('devWeightB'))  $('devWeightB').value  = Number(RANK_WEIGHTS.B  ?? 0);
+        if ($('devWeightC'))  $('devWeightC').value  = Number(RANK_WEIGHTS.C  ?? 0);
+      } catch (_) {}
+    };
+    const devAddDefaultStore = () => {
+      const root = $('devStoresList');
+      if (!root) return;
+      const idx = root.querySelectorAll('.dev-store-row').length;
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = devStoreRowHTML(idx);
+      // Append child of wrapper (the row div)
+      while (wrapper.firstChild) root.appendChild(wrapper.firstChild);
+      root.scrollTop = root.scrollHeight;
+    };
+    const devRemoveDefaultStore = (idx) => {
+      try {
+        const current = devCollectStoresFromList();
+        if (idx >= 0 && idx < current.length) current.splice(idx, 1);
+        devRenderStoresList(current);
+      } catch (_) {}
+    };
+
+    const showDevOverlay = () => {
+      const el = $('devOverlay');
+      if (!el) return;
+      el.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      devLoadCurrentDefaults();
+    };
+    const hideDevOverlay = () => {
+      const el = $('devOverlay');
+      if (!el) return;
+      el.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    };
+
+    const devSaveWeights = () => {
+      const aa = parseInt($('devWeightAA').value) || 0;
+      const a  = parseInt($('devWeightA').value)  || 0;
+      const b  = parseInt($('devWeightB').value)  || 0;
+      const c  = parseInt($('devWeightC').value)  || 0;
+      const nw = { AA: aa, A: a, B: b, C: c };
+      RANK_WEIGHTS = { ...RANK_WEIGHTS, ...nw };
+      const dev = loadDevSettings();
+      dev.rankWeights = nw;
+      saveDevSettings(dev);
+      showStatus('<strong>Success:</strong> Rank weights saved.', 'success');
+    };
+    const devRestoreBuiltinWeights = () => {
+      RANK_WEIGHTS = { ...BUILTIN_RANK_WEIGHTS };
+      const dev = loadDevSettings();
+      if (dev.rankWeights) delete dev.rankWeights;
+      saveDevSettings(dev);
+      devLoadCurrentDefaults();
+      showStatus('<strong>Success:</strong> Restored built-in weights.', 'success');
+    };
+
+    const validateStoreObj = (s) => {
+      if (!s) return false;
+      const hasProps = (p) => Object.prototype.hasOwnProperty.call(s, p);
+      return hasProps('code') && hasProps('name') && hasProps('rank') && hasProps('active');
+    };
+    const devCollectStoresFromList = () => {
+      const rows = Array.from(document.querySelectorAll('#devStoresList .dev-store-row'));
+      return rows.map((row,i) => {
+        const val = (sel) => (row.querySelector(sel)?.value ?? '').trim();
+        const chk = (sel) => !!row.querySelector(sel)?.checked;
+        const code = val('input[id^="devStore_code_"]');
+        const name = val('input[id^="devStore_name_"]');
+        const rank = val('select[id^="devStore_rank_"]') || 'B';
+        const active = chk('input[id^="devStore_active_"]');
+        return { code, name: name.toUpperCase(), rank: rank.toUpperCase(), active };
+      }).filter(s => s.code || s.name);
+    };
+    const devSaveDefaultStores = () => {
+      try {
+        const cleaned = devCollectStoresFromList();
+        if (!Array.isArray(cleaned) || cleaned.length === 0) { alert('Add at least one store to save.'); return; }
+        if (!cleaned.every(validateStoreObj)) { alert('Each store must have code, name, rank, active.'); return; }
+        const dev = loadDevSettings();
+        dev.defaultStores = cleaned;
+        saveDevSettings(dev);
+        showStatus('<strong>Success:</strong> Default stores saved.', 'success');
+      } catch (e) {
+        alert('Failed to save: ' + e.message);
+      }
+    };
+    const devApplyDefaultsToCurrent = () => {
+      try {
+        allStores = cloneDefaults();
+        rebuildStoreIndex();
+        updateStoreStatus();
+        updateDistributeButtonState();
+        saveUserPreferences();
+        saveAppState();
+        showStatus('<strong>Success:</strong> Replaced current stores from defaults.', 'success');
+      } catch (e) { alert('Failed to apply defaults: ' + e.message); }
+    };
+    const devClearSettings = () => {
+      if (!confirm('Clear all dev settings and restore built-ins?')) return;
+      try {
+        localStorage.removeItem(DEV_SETTINGS_KEY);
+      } catch {}
+      RANK_WEIGHTS = { ...BUILTIN_RANK_WEIGHTS };
+      devLoadCurrentDefaults();
+      showStatus('<strong>Success:</strong> Dev settings cleared.', 'success');
+    };
+
+    // Apply saved dev weights on load
+    (function applyDevOnLoad(){
+      try {
+        const dev = loadDevSettings();
+        if (dev && dev.rankWeights) {
+          const w = dev.rankWeights;
+          const nw = {
+            AA: Number(w.AA) || BUILTIN_RANK_WEIGHTS.AA,
+            A:  Number(w.A)  || BUILTIN_RANK_WEIGHTS.A,
+            B:  Number(w.B)  || BUILTIN_RANK_WEIGHTS.B,
+            C:  Number(w.C)  || BUILTIN_RANK_WEIGHTS.C,
+          };
+          RANK_WEIGHTS = { ...nw };
+        }
+      } catch(_){}
+    })();
+
+    // Tab management
+    const switchTab = (section, tabName, save = true) => {
+      const isStore = section === 'store';
+      const container = isStore ? '.sidebar .card' : '.main-area .card';
+      const tabs = $$$(`${container} .import-tab`);
+      const contents = $$$(`${container} .import-content`);
+      
+      tabs.forEach(tab => tab.classList.remove('active'));
+      contents.forEach(content => content.classList.remove('active'));
+      
+      const activeIndex = (isStore && tabName === 'add') || (!isStore && tabName === 'paste') ? 1 : 0;
+      tabs[activeIndex]?.classList.add('active');
+      $(`${tabName}-content`)?.classList.add('active');
+      
+      if (save) saveUserPreferences();
+    };
+
+    // Store management
+    const updateStoreCounts = () => {
+      const active = allStores.filter(s => s.active).length;
+      const inactive = allStores.length - active;
+      $('activeStoreCount').textContent = $('activeStoreCount2').textContent = active;
+      $('inactiveStoreCount').textContent = inactive;
+    };
+
+    const updateStoreStatus = () => {
+      updateStoreCounts();
+      const cont = $('storeStatusContainer');
+      const markup = sortStoresNumerically(allStores)
+        .map(store => {
+          const codeRaw = String(store.code ?? '');
+          const nameRaw = String(store.name ?? '');
+          const rankRaw = String(store.rank ?? '');
+          const code = escapeHtml(codeRaw);
+          const name = escapeHtml(nameRaw);
+          const rank = escapeHtml(rankRaw);
+          const rankClass = getRankClass(rankRaw);
+          const checkboxAttr = store.active ? 'checked' : '';
+          return `
+          <div class="store-item">
+            <input type="checkbox" ${checkboxAttr} data-store-code="${code}" onchange="toggleStoreStatus(this.dataset.storeCode, this.checked)"/>
+            <div class="info">
+              <span class="code">${code}</span>
+              <span class="name">${name}</span>
+              <span class="rank-badge rank-${rankClass}">${rank}</span>
+            </div>
+            <button class="remove-btn" data-store-code="${code}" onclick="removeStore(this.dataset.storeCode)">&times;</button>
+          </div>`;
+        })
+        .join('');
+      cont.innerHTML = markup;
+      cont.classList.add('update-flash');
+      setTimeout(()=>cont.classList.remove('update-flash'), 400);
+      updateDistributeButtonState();
+      if (typeof syncSidebarToQueue === 'function') syncSidebarToQueue();
+    };
+
+    const toggleStoreStatus = (storeCode, isActive) => {
+      const store = getStoreByCode(storeCode);
+      if (store) {
+        store.active = isActive;
+        updateStoreCounts();
+        saveUserPreferences();
+        saveAppState();
+        updateDistributeButtonState();
+      }
+    };
+
+    const toggleAllStores = active => {
+      allStores.forEach(s => s.active = active);
+      updateStoreStatus();
+      saveUserPreferences();
+      saveAppState();
+    };
+
+    const removeStore = storeCode => {
+      if (confirm(`Delete store ${storeCode}?`)) {
+        allStores = allStores.filter(s => s.code !== storeCode);
+        rebuildStoreIndex();
+        updateStoreStatus();
+        updateDistributeButtonState();
+        saveUserPreferences();
+        saveAppState();
+      }
+    };
+
+    const addNewStore = () => {
+      const code = $('newStoreCode').value.trim();
+      const name = $('newStoreName').value.trim();
+      const rank = $('newStoreRank').value;
+      const active = $('newStoreActive').checked;
+      
+      if (!code || !name) { alert('Please enter both code and name'); return; }
+      if (getStoreByCode(code)) { alert('Store code already exists'); return; }
+      
+      allStores.push({code, name: name.toUpperCase(), rank, active});
+      rebuildStoreIndex();
+      ['newStoreCode', 'newStoreName'].forEach(id => $(id).value = '');
+      $('newStoreRank').value = 'B';
+      $('newStoreActive').checked = true;
+      updateStoreStatus();
+      switchTab('store', 'manage');
+      updateDistributeButtonState();
+      saveUserPreferences();
+      saveAppState();
+    };
+
+    // New: re-add default stores on demand
+    const restoreDefaults = () => {
+      if (!confirm('Re-add all default stores? This will overwrite your current list.')) return;
+      allStores = cloneDefaults();
+      rebuildStoreIndex();
+      // clear stale prefs so defaults persist on reload
+      document.cookie = "allocationBuddyPrefs=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict";
+      updateStoreStatus();
+      updateDistributeButtonState();
+      saveUserPreferences();
+      showStatus('<strong>✅ Default stores restored.</strong>', 'success');
+      saveAppState();
+    };
+
+    // Import handling
+    const handleFileUpload = event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      // Validate file type - Excel files only
+      const fileName = file.name.toLowerCase();
+      const allowedExtensions = ['.xlsx', '.xls', '.xlsm', '.xlsb', '.xltx', '.xltm', '.xlt'];
+      const isValidFile = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!isValidFile) {
+        $('fileStatus').innerHTML = '❌ Please select an Excel file (.xlsx, .xls, .xlsm, etc.)';
+        event.target.value = ''; // Clear the file input
+        return;
+      }
+      
+      $('fileStatus').innerHTML = '📊 Reading file...';
+      importFile(file);
+    };
+
+    // Saved column mappings per sheet
+    const COLMAP_KEY = 'allocationBuddyColMapV1';
+    const getSavedMappingForSheet = (sheetName) => {
+      try { const all = JSON.parse(localStorage.getItem(COLMAP_KEY) || '{}'); return all && all[sheetName] ? all[sheetName] : null; } catch(e){ return null; }
+    };
+    const saveMappingForSheet = (sheetName, mapping) => {
+      try { const all = JSON.parse(localStorage.getItem(COLMAP_KEY) || '{}'); all[sheetName] = mapping; localStorage.setItem(COLMAP_KEY, JSON.stringify(all)); } catch(e){}
+    };
+    const applySavedMappingIfAny = async () => {
+      const selector = $('sheetSelector');
+      if (!selector) return;
+      const name = selector.value;
+      const map = getSavedMappingForSheet(name);
+      if (map) {
+        await importFromSheet(name, map);
+      } else {
+        $('fileStatus').innerHTML += "<div style=\"font-size:12px;color:var(--muted);margin-top:6px;\">No saved mapping for this sheet.</div>";
+      }
+    };
+
+    const importFile = (file) => {
+      const reader = new FileReader();
+      reader.onload = async e => {
+        try {
+          currentWorkbook = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates: true, dateNF: 'yyyy-mm-dd'});
+          if (currentWorkbook.SheetNames.length === 1) {
+            await importFromSheet(currentWorkbook.SheetNames[0]);
+          } else {
+            showSheetSelector();
+          }
+        } catch (err) {
+          $('fileStatus').innerHTML = `❌ Error reading file: ${err.message}`;
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
+    const showSheetSelector = () => {
+      const options = currentWorkbook.SheetNames.map(name => `<option value="${name}">${name}</option>`).join('');
+      $('fileStatus').innerHTML = `
+        <div style="margin: 10px 0;">
+          <label style="display: block; margin-bottom: 5px; font-weight: 500;">Select Sheet to Import:</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="sheetSelector" class="flex-1 input-compact">${options}</select>
+            <button class="big-button" onclick="importSelectedSheet()">Import</button>
+          </div>
+          <button class="big-button full-width mt-8" onclick="showColumnMapper()">Advanced Import (Column Mapping)</button>
+          <button class="big-button full-width mt-8" onclick="applySavedMappingIfAny()">Use Saved Mapping (if available)</button>
+        </div>`;
+    };
+
+    const importSelectedSheet = async () => {
+      const selector = $('sheetSelector');
+      if (selector) await importFromSheet(selector.value);
+    };
+    const importFromSheet = async (sheetName, columnMapping = null) => {
+      try {
+        let debugOutput = '';
+        const dictionaryAvailable = await ensureItemDictionaryLoaded();
+        const useDictionary = dictionaryAvailable && dictionaryState.ready;
+        if (!useDictionary) {
+          const lastError = dictionaryState.lastError;
+          const messageParts = ['Dictionary data is required for automatic import.'];
+          if (lastError && lastError.message) {
+            const cleaned = String(lastError.message).replace(/\s+/g, ' ').trim();
+            if (cleaned) messageParts.push(' Load error: ' + cleaned + '.');
+          }
+          if (window.location && window.location.protocol === 'file:') {
+            messageParts.push(' Browsers often block module imports for file:// URLs. Open this file through a local web server (for example: python -m http.server) to enable dictionary loading.');
+          }
+          $('fileStatus').innerHTML = messageParts.join('');
+          return;
+        }
+
+        const rows = XLSX.utils.sheet_to_json(currentWorkbook.Sheets[sheetName], {header:1, defval:'', raw: false});
+        if (rows.length === 0) {
+          $('fileStatus').innerHTML = 'Sheet is empty';
+          return;
+        }
+
+        const qtyHeaderPatterns = /(qty|quantity|allocations|amount|units|order)/i;
+        const itemHeaderPatterns = /(item|style|sku|product)/i;
+        const storeHeaderPatterns = /(store|location|dest|code|shop)/i;
+        const MAX_SAMPLE_ROWS = 120;
+
+        const detectHeaderRow = () => {
+          const maxRowsToScan = Math.min(15, rows.length);
+          let bestRow = 0;
+          let bestScore = -Infinity;
+          for (let i = 0; i < maxRowsToScan; i++) {
+            const candidate = rows[i] || [];
+            let rowScore = 0;
+            candidate.forEach(cell => {
+              const cellStr = String(cell ?? '').trim().toLowerCase();
+              if (!cellStr) return;
+              if (qtyHeaderPatterns.test(cellStr)) rowScore += 3;
+              if (itemHeaderPatterns.test(cellStr)) rowScore += 2;
+              if (storeHeaderPatterns.test(cellStr)) rowScore += 2;
+              if (/^[a-z\s]+$/.test(cellStr)) rowScore += 1;
+            });
+            if (rowScore > bestScore) {
+              bestScore = rowScore;
+              bestRow = i;
+            }
+          }
+          return bestRow;
+        };
+
+        let headerRow = typeof columnMapping?.headerRow === 'number' ? columnMapping.headerRow : detectHeaderRow();
+        headerRow = Math.max(0, Math.min(headerRow, rows.length - 1));
+
+        const headerCells = (rows[headerRow] ?? []).map(cell => String(cell ?? '').trim());
+        const lowerHeaderCells = headerCells.map(cell => cell.toLowerCase());
+
+        const resolveQuantityColumn = () => {
+          if (typeof columnMapping?.qtyCol === 'number' && columnMapping.qtyCol >= 0) {
+            return columnMapping.qtyCol;
+          }
+          return lowerHeaderCells.findIndex(cell => qtyHeaderPatterns.test(cell));
+        };
+
+        const qtyCol = resolveQuantityColumn();
+        if (qtyCol === -1) {
+          throw new Error('Unable to identify a Quantity column from the header row. Please ensure it contains "Qty" or "Quantity".');
+        }
+
+        const collectSampleValues = (colIdx, limit = MAX_SAMPLE_ROWS) => {
+          const samples = [];
+          const seen = new Set();
+          for (let r = headerRow + 1; r < rows.length && samples.length < limit; r++) {
+            const cell = rows[r]?.[colIdx];
+            if (cell === undefined || cell === null) continue;
+            const cellStr = String(cell).trim();
+            if (!cellStr) continue;
+            const key = cellStr.toUpperCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            samples.push(cellStr);
+          }
+          return samples;
+        };
+
+        const scoreItemColumn = (colIdx) => {
+          const samples = collectSampleValues(colIdx);
+          if (!samples.length) return { score: -Infinity, matches: 0, sampleCount: 0 };
+          let matches = 0;
+          for (const value of samples) {
+            const upper = value.toUpperCase();
+            if (dictionaryState.numberIndex.has(upper)) {
+              matches++;
+              continue;
+            }
+            const normalized = normalizeDictionaryText(value);
+            if (normalized && (dictionaryState.descIndex.has(normalized) || dictionaryState.descCompactIndex.has(normalized.replace(/\s+/g, '')))) {
+              matches++;
+              continue;
+            }
+          }
+          if (!matches) return { score: -Infinity, matches: 0, sampleCount: samples.length };
+          const score = matches * 10 - (samples.length - matches);
+          return { score, matches, sampleCount: samples.length };
+        };
+
+        const scoreStoreColumn = (colIdx) => {
+          const samples = collectSampleValues(colIdx);
+          if (!samples.length) return { score: -Infinity, matches: 0, sampleCount: 0 };
+          let matches = 0;
+          for (const value of samples) {
+            const entry = resolveStoreFromDictionary(value) || resolveStoreFromDictionary(String(value).replace(/^0+/, ''));
+            if (entry) matches++;
+          }
+          if (!matches) return { score: -Infinity, matches: 0, sampleCount: samples.length };
+          const score = matches * 10 - (samples.length - matches);
+          return { score, matches, sampleCount: samples.length };
+        };
+
+        const pickColumn = (scoreFn, excludedCols = new Set()) => {
+          let best = { col: -1, score: -Infinity, matches: 0, sampleCount: 0 };
+          headerCells.forEach((_, idx) => {
+            if (excludedCols.has(idx)) return;
+            const result = scoreFn(idx);
+            if (result.score > best.score || (result.score === best.score && result.matches > best.matches)) {
+              best = { col: idx, ...result };
+            }
+          });
+          return best;
+        };
+
+        const fallbackColumnByHeader = (pattern, excludedCols = new Set()) => {
+          for (let idx = 0; idx < lowerHeaderCells.length; idx++) {
+            if (excludedCols.has(idx)) continue;
+            if (pattern.test(lowerHeaderCells[idx] || '')) {
+              return idx;
+            }
+          }
+          return -1;
+        };
+
+        let itemCol = typeof columnMapping?.itemCol === 'number' ? columnMapping.itemCol : -1;
+        if (itemCol === -1) {
+          const result = pickColumn(scoreItemColumn, new Set([qtyCol]));
+          if (result.col === -1) {
+            const fallbackIdx = fallbackColumnByHeader(itemHeaderPatterns, new Set([qtyCol]));
+            if (fallbackIdx === -1) {
+              throw new Error('Unable to detect the item column using dictionary data. Update dictionaries.js or use Advanced Import.');
+            }
+            itemCol = fallbackIdx;
+            debugOutput += `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Fell back to header "${headerCells[itemCol] || `Column ${itemCol + 1}`}" for item column</div>`;
+          } else {
+            itemCol = result.col;
+            debugOutput += `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Detected item column "${headerCells[itemCol] || `Column ${itemCol + 1}`}" via dictionary matches (${result.matches}/${result.sampleCount})</div>`;
+          }
+        }
+
+        let storeCol = typeof columnMapping?.storeCol === 'number' ? columnMapping.storeCol : -1;
+        if (storeCol === -1) {
+          const excludedForStore = new Set([qtyCol, itemCol]);
+          const result = pickColumn(scoreStoreColumn, excludedForStore);
+          if (result.col === -1) {
+            const fallbackIdx = fallbackColumnByHeader(storeHeaderPatterns, excludedForStore);
+            if (fallbackIdx === -1) {
+              throw new Error('Unable to detect the store column using dictionary data. Update dictionaries.js or use Advanced Import.');
+            }
+            storeCol = fallbackIdx;
+            debugOutput += `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Fell back to header "${headerCells[storeCol] || `Column ${storeCol + 1}`}" for store column</div>`;
+          } else {
+            storeCol = result.col;
+            debugOutput += `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Detected store column "${headerCells[storeCol] || `Column ${storeCol + 1}`}" via dictionary matches (${result.matches}/${result.sampleCount})</div>`;
+          }
+        }
+
+        saveMappingForSheet(sheetName, { itemCol, qtyCol, storeCol, headerRow });
+
+        let dictionaryResolvedCount = 0;
+        let dictionaryAttempted = 0;
+        let imported = 0, skipped = 0;
+        const errors = [];
+
+        rows.forEach((row, idx) => {
+          if (idx <= headerRow) return;
+
+          if (!Array.isArray(row)) return;
+          const isEmptyRow = row.every(cell => String(cell ?? '').trim() === '');
+          if (isEmptyRow) return;
+
+          const rowText = row.join(' ').toLowerCase();
+          if (/\btotals?\b/.test(rowText)) {
+            skipped++;
+            errors.push(`Row ${idx + 1}: Skipped totals row`);
+            return;
+          }
+
+          const rawItemValue = row[itemCol];
+          const storeIdentifierRaw = String(row[storeCol] ?? '').trim();
+          const storeIdentifierStripped = storeIdentifierRaw.replace(/^0+/, '');
+
+          const resolution = resolveItemNumberFromDictionary(
+            rawItemValue,
+            row,
+            { ignoreColumns: [storeCol], ignoreValues: [storeIdentifierRaw, storeIdentifierStripped] }
+          );
+
+          dictionaryAttempted++;
+          if (resolution.matched) dictionaryResolvedCount++;
+
+          const itemNumber = String(resolution.code ?? '').toUpperCase().trim();
+          const quantityRaw = row[qtyCol];
+          const dictionaryStoreEntry = resolveStoreFromDictionary(storeIdentifierRaw) || resolveStoreFromDictionary(storeIdentifierStripped);
+
+          let itemSource = `Excel (${sheetName})`;
+          if (resolution.matched) itemSource += ' [dict]';
+          if (dictionaryStoreEntry) itemSource += ' [dict-store]';
+          const resolvedStoreCode = dictionaryStoreEntry?.code || storeIdentifierStripped || storeIdentifierRaw;
+
+          let quantity = typeof quantityRaw === 'number' ? quantityRaw : parseFloat(String(quantityRaw).replace(/[^\d.-]/g, ''));
+
+          if (!itemNumber || !Number.isFinite(quantity) || quantity <= 0 || !resolvedStoreCode) {
+            if (itemNumber || quantityRaw || resolvedStoreCode) {
+              skipped++;
+              let errorDetail = `Row ${idx + 1}:`;
+              if (!itemNumber) errorDetail += ` Missing item`;
+              if (!Number.isFinite(quantity) || quantity <= 0) errorDetail += ` Invalid qty(${quantityRaw})`;
+              if (!resolvedStoreCode) errorDetail += ` Missing store`;
+              errors.push(errorDetail);
+            }
+            return;
+          }
+
+          let store = findStoreByCodeOrName(storeIdentifierRaw);
+          if (!store && storeIdentifierStripped !== storeIdentifierRaw) {
+            store = findStoreByCodeOrName(storeIdentifierStripped);
+          }
+          if (!store && dictionaryStoreEntry) {
+            store = findStoreByCodeOrName(dictionaryStoreEntry.code);
+          }
+          if (!store && dictionaryStoreEntry) {
+            const fallbackStore = {
+              code: dictionaryStoreEntry.code,
+              name: dictionaryStoreEntry.name,
+              rank: 'B',
+              active: true
+            };
+            allStores.push(fallbackStore);
+            rebuildStoreIndex();
+            store = fallbackStore;
+          }
+
+          const storeCodeForItem = store ? store.code : resolvedStoreCode;
+
+          itemsToSort.push({
+            itemNumber,
+            quantity: Math.floor(quantity),
+            storeCode: storeCodeForItem,
+            source: itemSource
+          });
+          imported++;
+        });
+
+        if (dictionaryAttempted > 0) {
+          debugOutput += `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Dictionary resolved ${dictionaryResolvedCount} of ${dictionaryAttempted} item values</div>`;
+        }
+
+        let statusMsg = `Imported ${imported} items from "${sheetName}"`;
+        if (skipped > 0) {
+          statusMsg += ` (${skipped} rows skipped)`;
+          if (errors.length <= 10) {
+            statusMsg += `<div style="font-size: 11px; color: var(--muted); margin-top: 5px;">Issues: ${errors.join('; ')}</div>`;
+          } else {
+            statusMsg += `<div style="font-size: 11px; color: var(--muted); margin-top: 5px;">${errors.length} rows had issues. First 10: ${errors.slice(0, 10).join('; ')}</div>`;
+          }
+        }
+
+        statusMsg += `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Columns used - Item:${itemCol+1}, Qty:${qtyCol+1}, Store:${storeCol+1} (Header row: ${headerRow+1})</div>`;
+        statusMsg += debugOutput;
+
+        $('fileStatus').innerHTML = statusMsg;
+        updateImportDisplay();
+        if (shouldCombineDuplicates && shouldCombineDuplicates()) combineAllDuplicates();
+        saveAppState();
+      } catch (err) {
+        $('fileStatus').innerHTML = `Import error: ${err.message}`;
+      }
+    };
+
+
+    const showColumnMapper = () => {
+      const sheetName = $('sheetSelector').value;
+      const rows = XLSX.utils.sheet_to_json(currentWorkbook.Sheets[sheetName], {header:1, defval:'', raw: false});
+      if (rows.length === 0) return;
+      
+      const previewRows = rows.slice(0, 5);
+      $('fileStatus').innerHTML = `
+        <div class="colmap-wrapper" style="margin: 10px 0;">
+          <h4 class="colmap-heading">Column Mapping for "${sheetName}"</h4>
+          <input type="hidden" id="selectedSheetForImport" value="${sheetName}" />
+          <div class="colmap-preview" style="padding: 8px; border-radius: 4px; margin: 8px 0; max-height: 150px; overflow: auto;">
+            <table class="colmap-table" style="width: 100%; font-size: 11px; border-collapse: collapse;">
+              ${previewRows.map((row, idx) => `
+                <tr class="colmap-row" style="border-bottom: 1px solid var(--input-border);">
+                  <td class="colmap-index" style="padding: 2px 4px; font-weight: bold;">${idx + 1}</td>
+                  ${row.slice(0, 10).map((cell, colIdx) => `
+                    <td class="colmap-cell" style="padding: 2px 4px;" title="Column ${String.fromCharCode(65 + colIdx)}: ${String(cell)}">${String(cell).substring(0, 15)}</td>
+                  `).join('')}
+                </tr>
+              `).join('')}
+            </table>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0;">
+            ${['Item', 'Quantity', 'Store'].map((label, i) => `
+              <div>
+                <label style="font-size: 12px; font-weight: 500;">${label} Column:</label>
+                <select id="${['item', 'qty', 'store'][i]}ColSelect" class="full-width input-compact">
+                  ${rows[0].map((_, idx) => `<option value="${idx}" ${idx === i ? 'selected' : ''}>Column ${String.fromCharCode(65 + idx)} (${String(rows[0][idx]).substring(0, 10)})</option>`).join('')}
+                </select>
+                ${i === 1 ? '<div class="colmap-note" style="font-size: 10px; color: var(--muted); margin-top: 2px;">Looks for: qty, quantity, allocations, order, amount, units</div>' : ''}
+                ${i === 2 ? '<div class="colmap-note" style="font-size: 10px; color: var(--muted); margin-top: 2px;">Accepts store codes or names</div>' : ''}
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin: 8px 0;">
+            <label style="font-size: 12px; font-weight: 500;">Header Row (skip this many rows):</label>
+            <input type="number" id="headerRowInput" value="0" min="0" max="10" class="w-60 input-compact">
+          </div>
+          <button class="big-button success full-width" onclick="importWithMapping()">Import with Custom Mapping</button>
+        </div>`;
+    };
+
+    const processPastedData = () => {
+      const pasteData = $('pasteArea').value.trim();
+      if (!pasteData) { alert('Please paste some data first'); return; }
+      
+      const lines = pasteData.split('\n').filter(line => line.trim());
+      let imported = 0, skipped = 0;
+      const errors = [];
+      
+      lines.forEach((line, idx) => {
+        const parts = (line.includes('\t') ? line.split('\t') : line.split(',')).map(p => p.trim()).filter(p => p);
+        if (parts.length < 3) {
+          skipped++;
+          errors.push(`Line ${idx + 1}: Insufficient data`);
+          return;
+        }
+        
+        const [itemNumber, quantityStr, storeIdentifier] = parts;
+        const quantity = parseInt(quantityStr, 10);
+        
+        if (!itemNumber || !Number.isFinite(quantity) || quantity <= 0 || !storeIdentifier) {
+          skipped++;
+          errors.push(`Line ${idx + 1}: Invalid data`);
+          return;
+        }
+        
+        const store = findStoreByCodeOrName(storeIdentifier);
+        if (!store) {
+          itemsToSort.push({itemNumber, quantity, storeCode: storeIdentifier, source:'Paste'});
+          imported++;
+          return;
+        }
+        
+        itemsToSort.push({itemNumber, quantity, storeCode: store.code, source:'Paste'});
+        imported++;
+      });
+      
+      if (imported > 0) {
+        $('pasteArea').value = '';
+        updateImportDisplay();
+        if (shouldCombineDuplicates && shouldCombineDuplicates()) combineAllDuplicates();
+        saveAppState();
+        let message = `✅ Added ${imported} items`;
+        if (skipped > 0) {
+          message += ` (${skipped} rows skipped)`;
+          if (errors.length <= 3) message += `\n\nSkipped: ${errors.join('; ')}`;
+        }
+        alert(message);
+      } else {
+        alert(`No valid items found${errors.length > 0 ? `\n\nErrors: ${errors.slice(0, 5).join('; ')}` : ''}`);
+      }
+    };
+
+    const updateImportDisplay = () => {
+      $('itemCount').textContent = itemsToSort.length;
+      $('storeDestinationCount').textContent = [...new Set(itemsToSort.map(item => item.storeCode))].length;
+      
+      const clearBtn = $('clearBtn');
+      if (itemsToSort.length === 0) {
+        $('importContainer').innerHTML = '<div class="simple-alert alert-info">No items imported yet.</div>';
+        clearBtn.classList.add('hidden');
+        updateDistributeButtonState();
+        return;
+      }
+      
+      clearBtn.classList.remove('hidden');
+      if (!Number.isFinite(importRenderLimit) || importRenderLimit < 1) importRenderLimit = IMPORT_CHUNK;
+      const total = itemsToSort.length;
+      const limit = Math.min(importRenderLimit, total);
+      const visible = itemsToSort.slice(0, limit);
+        const listHtml = visible.map((item, index) => {
+        const store = getStoreByCode(item.storeCode);
+        const status = !store ? 'NOT FOUND' : (store.active ? 'ACTIVE' : 'INACTIVE');
+        // Use theme tokens for status colors; fall back to the original hex values if tokens are missing.
+  const danger = cssVar('--danger');
+  const success = cssVar('--success-2');
+  const warning = cssVar('--warning');
+        const statusColor = !store ? danger : (store.active ? success : warning);
+        return `
+          <div class="queue-item">
+            <div>
+              <strong>${item.itemNumber}</strong> → ${item.storeCode}
+              <div class="details">Qty: ${item.quantity} | <span style="color:${statusColor};">${status}</span> | Source: ${item.source}</div>
+            </div>
+            <button class="remove-btn" onclick="removeItem(${index})">×</button>
+          </div>`;
+      }).join('');
+      const more = total - limit;
+      const moreHtml = more > 0 ? `
+        <div style="display:flex;justify-content:center;margin-top:8px;">
+          <button class="big-button" onclick="loadMoreImport()">Show more (${more})</button>
+        </div>` : '';
+      const cont = $('importContainer');
+      cont.innerHTML = listHtml + moreHtml;
+      cont.classList.add('update-flash');
+      setTimeout(()=>cont.classList.remove('update-flash'), 400);
+      updateDistributeButtonState();
+      if (typeof syncSidebarToQueue === 'function') syncSidebarToQueue();
+    };
+
+    const loadMoreImport = () => {
+      importRenderLimit = Math.min(importRenderLimit + IMPORT_CHUNK, itemsToSort.length);
+      updateImportDisplay();
+    };
+
+    const removeItem = index => {
+      const cont = $('importContainer');
+      const nodes = cont ? cont.querySelectorAll('.queue-item') : [];
+      const node = nodes && nodes[index];
+      const removed = itemsToSort[index];
+      if (!removed) return;
+      startUndo({type:'removeItem', payload:{item:{...removed}, index}});
+      if (node) {
+        node.classList.add('removing');
+        setTimeout(() => { itemsToSort.splice(index,1); updateImportDisplay(); saveAppState(); }, 200);
+      } else {
+        itemsToSort.splice(index,1); updateImportDisplay(); saveAppState();
+      }
+    };
+    const clearImport = () => { if(confirm('Clear all items?')){ const prev=[...itemsToSort]; startUndo({type:'clearImport', payload:{items:prev}}); itemsToSort=[]; updateImportDisplay(); saveAppState(); } };
+
+    // -------- Combine duplicate items helper --------
+    const shouldCombineDuplicates = () => !!($('combineToggle')?.checked || $('combineToggle2')?.checked);
+    const combineAllDuplicates = () => {
+      const map = new Map();
+      const combined = [];
+      itemsToSort.forEach(it => {
+        const key = `${it.itemNumber}|${it.storeCode}`;
+        if (!map.has(key)) { map.set(key, {...it}); combined.push(map.get(key)); }
+        else { map.get(key).quantity += it.quantity; }
+      });
+      itemsToSort = combined;
+      updateImportDisplay();
+      saveAppState();
+      showStatus('<strong>✅ Combined duplicate lines.</strong>', 'success');
+    };
+
+    // -------- Undo actions (Remove item / Clear import / Remove store) --------
+    let pendingUndo = null;
+    const showActionToast = (message, onUndo) => {
+      const t = $('actionToast'); if (!t) return;
+  t.innerHTML = `${message} <button id="undoBtn" class="copy-btn ml-8">Undo</button>`;
+      t.classList.add('show');
+      const btn = $('undoBtn');
+      const close = () => t.classList.remove('show');
+      if (btn) btn.onclick = () => { try { onUndo && onUndo(); } finally { close(); pendingUndo=null; } };
+      setTimeout(close, 5000);
+    };
+    const startUndo = (action) => {
+      pendingUndo = action;
+      if (action.type === 'removeItem') {
+        showActionToast('Item removed.', () => {
+          const {item, index} = action.payload; itemsToSort.splice(Math.min(index, itemsToSort.length), 0, item); updateImportDisplay(); saveAppState();
+        });
+      } else if (action.type === 'clearImport') {
+        showActionToast('Cleared import.', () => { itemsToSort = action.payload.items; updateImportDisplay(); saveAppState(); });
+      } else if (action.type === 'removeStore') {
+        showActionToast('Store removed.', () => { allStores.push(action.payload.store); rebuildStoreIndex(); updateStoreStatus(); saveUserPreferences(); });
+      }
+    };
+
+    // Distribution and sorting
+    const rankWeight = rank => RANK_WEIGHTS[String(rank).toUpperCase()] || 1;
+
+    // Respect manual selections: collect chosen target stores and problem-item keys
+    const getSelectedManualAssignmentTargets = () => {
+      try {
+        const selects = Array.from(document.querySelectorAll('.assign-select'));
+        const chosenFromDOM = selects
+          .map(s => (s && typeof s.value === 'string') ? s.value.trim() : '')
+          .filter(v => !!v);
+        const chosenFromMemory = Object.values(manualAssignSelections || {}).filter(Boolean);
+        return new Set([...chosenFromDOM, ...chosenFromMemory]);
+      } catch (_) {
+        return new Set();
+      }
+    };
+
+    const getSelectedManualProblemKeys = () => {
+      try {
+        const selects = Array.from(document.querySelectorAll('.assign-select'));
+        const keysFromDOM = selects
+          .filter(s => s && s.value && s.getAttribute('data-item') && s.getAttribute('data-store'))
+          .map(s => `${s.getAttribute('data-item')}|${s.getAttribute('data-store')}`);
+        const keysFromMemory = Object.keys(manualAssignSelections || {}).filter(k => !!manualAssignSelections[k]);
+        return new Set([...keysFromDOM, ...keysFromMemory]);
+      } catch (_) {
+        return new Set();
+      }
+    };
+
+    // Apply saved selections to Assign-To dropdowns and keep them updated
+    const applySavedAssignSelections = () => {
+      try {
+        const selects = document.querySelectorAll('.assign-select');
+        selects.forEach(sel => {
+          const item = sel.getAttribute('data-item');
+          const from = sel.getAttribute('data-store');
+          const key = `${item}|${from}`;
+          const saved = manualAssignSelections[key];
+          if (saved) {
+            sel.value = saved;
+          }
+        });
+      } catch (_) { /* noop */ }
+    };
+    const attachAssignSelectHandlers = () => {
+      try {
+        const selects = document.querySelectorAll('.assign-select');
+        selects.forEach(sel => {
+          sel.onchange = e => {
+            const v = (e.target && typeof e.target.value === 'string') ? e.target.value.trim() : '';
+            const item = sel.getAttribute('data-item');
+            const from = sel.getAttribute('data-store');
+            const key = `${item}|${from}`;
+            if (v) manualAssignSelections[key] = v; else delete manualAssignSelections[key];
+            saveAppState();
+          };
+        });
+      } catch (_) { /* noop */ }
+    };
+
+    const getActiveTargetsInCurrentResults = () => {
+      if (!lastResults?.sortedStores) return [];
+      const resultCodes = new Set(lastResults.sortedStores.map(s => s.storeCode));
+      const reservedTargets = getSelectedManualAssignmentTargets();
+      return allStores
+        .filter(s => s.active && resultCodes.has(s.code) && !reservedTargets.has(s.code))
+        .sort((a,b) => {
+          const w = rankWeight(b.rank) - rankWeight(a.rank);
+          return w !== 0 ? w : ((a._codeNum||999999) - (b._codeNum||999999));
+        });
+    };
+
+    const hasProblemAssignments = () => {
+      if (lastResults?.issues) return lastResults.issues.some(i => i.type === 'inactive' || i.type === 'not_found');
+      return itemsToSort.some(it => {
+        const s = getStoreByCode(it.storeCode);
+        return !s || (s && !s.active);
+      });
+    };
+
+    // Manual assignment helpers
+    const getAllActiveStoresSorted = () => {
+      return allStores
+        .filter(s => s.active)
+        .sort((a,b) => {
+          const w = rankWeight(b.rank) - rankWeight(a.rank);
+          const an = (a._codeNum || getCodeNumFromObj(a));
+          const bn = (b._codeNum || getCodeNumFromObj(b));
+          return w !== 0 ? w : (an - bn);
+        });
+    };
+    const buildStoreOptionsHTML = (excludeCode = null) => {
+      const active = allStores
+        .filter(s => s.active)
+        .slice()
+        .sort((a,b) => (a._codeNum ?? getCodeNumFromObj(a)) - (b._codeNum ?? getCodeNumFromObj(b)));
+      if (!active.length) return '<option value="">No active stores</option>';
+      const rows = ['<option value="">Select store...</option>'];
+      active.forEach(store => {
+        const codeRaw = String(store.code ?? '');
+        if (excludeCode && codeRaw === excludeCode) return;
+        const nameRaw = String(store.name ?? '');
+        const rankRaw = String(store.rank ?? '');
+        const code = escapeHtml(codeRaw);
+        const name = escapeHtml(nameRaw);
+        const rank = escapeHtml(rankRaw);
+        rows.push(`<option value="${code}">${code} - ${name} (${rank})</option>`);
+      });
+      return rows.join('');
+    };
+
+    const assignSelectedIssues = () => {
+      const selects = document.querySelectorAll('.assign-select');
+      let movedLines = 0, movedQty = 0;
+      // Track deltas like auto-redistribute so UI highlights rows
+      const pendingDeltas = {};
+      selects.forEach(sel => {
+        const target = sel.value;
+        if (!target) return;
+        const itemNumber = sel.getAttribute('data-item');
+        const fromCode = sel.getAttribute('data-store');
+        const qty = parseInt(sel.getAttribute('data-qty')) || 0;
+        const targetStore = getStoreByCode(target);
+        if (!targetStore || !targetStore.active) return;
+
+        let idx = itemsToSort.findIndex(it => it.itemNumber === itemNumber && it.storeCode === fromCode && it.quantity === qty);
+        if (idx === -1) idx = itemsToSort.findIndex(it => it.itemNumber === itemNumber && it.storeCode === fromCode);
+        if (idx === -1) return;
+
+        const src = itemsToSort[idx];
+        itemsToSort.splice(idx, 1);
+
+        const existingIdx = itemsToSort.findIndex(it => it.itemNumber === itemNumber && it.storeCode === target);
+        if (existingIdx >= 0) {
+          itemsToSort[existingIdx].quantity += qty;
+          itemsToSort[existingIdx].source = 'Manual';
+        } else {
+          itemsToSort.push({ itemNumber, quantity: qty, storeCode: target, source: 'Manual' });
+        }
+        const key = `${itemNumber}|${target}`;
+        pendingDeltas[key] = (pendingDeltas[key] || 0) + qty;
+        movedLines += 1;
+        movedQty += qty;
+        // Clear saved selection for this processed problem row
+        const manualKey = `${itemNumber}|${fromCode}`;
+        if (manualAssignSelections[manualKey]) delete manualAssignSelections[manualKey];
+      });
+
+      if (movedLines === 0) {
+        showStatus('<strong>Info:</strong> No assignments selected. Choose a target store first.', 'info');
+        return;
+      }
+
+      lastResults = null;
+      if (movedLines > 0) {
+        // Accumulate manual highlights; keep previous entries
+        Object.keys(pendingDeltas).forEach(key => {
+          const val = pendingDeltas[key] || 0;
+          const entry = redistributionDeltas[key] || {auto:0, manual:0};
+          // Backward-compat if numeric stored previously
+          if (typeof entry === 'number') {
+            redistributionDeltas[key] = {auto:entry, manual:val};
+          } else {
+            entry.manual = (entry.manual || 0) + val;
+            redistributionDeltas[key] = entry;
+          }
+        });
+      }
+      updateImportDisplay();
+      saveAppState();
+      showStatus(`<strong>✅ Assigned:</strong> ${movedLines} line(s), ${movedQty} unit(s). Resorting...`, 'success');
+      setTimeout(() => sortItems(), 50);
+    };
+
+    const distributeProblemItems = () => {
+      const targets = getActiveTargetsInCurrentResults();
+      if (targets.length === 0) {
+        showStatus('<strong>ℹ️ No eligible target stores.</strong> Run "Sort by Store" first, and ensure at least one active store appears in results.', 'info');
+        updateDistributeButtonState();
+        return {moved:0, lines:0, targets:0};
+      }
+
+      // Preserve previous manual highlights; clear only auto deltas
+      const prevD = redistributionDeltas || {};
+      redistributionDeltas = {};
+      Object.keys(prevD).forEach(k => {
+        const v = prevD[k];
+        const manual = typeof v === 'number' ? 0 : (v?.manual || 0);
+        if (manual > 0) redistributionDeltas[k] = {auto:0, manual};
+      });
+      const redistributedItems = [];
+      const problemAssignments = [];
+      const keep = [];
+      // Items with a manual destination selected should be ignored by auto-redistribute
+      const manualReservedKeys = getSelectedManualProblemKeys();
+
+      itemsToSort.forEach(it => {
+        const s = getStoreByCode(it.storeCode);
+        const isProblem = (!s || !s.active);
+        if (isProblem) {
+          const manualKey = `${it.itemNumber}|${it.storeCode}`;
+          if (manualReservedKeys.has(manualKey)) {
+            keep.push(it);
+          } else {
+            problemAssignments.push(it);
+          }
+        } else {
+          keep.push(it);
+        }
+      });
+
+      if (problemAssignments.length === 0) {
+        showStatus('<strong>ℹ️ Nothing to distribute.</strong> No items are assigned to inactive or unknown stores.', 'info');
+        updateDistributeButtonState();
+        return {moved:0, lines:0, targets:targets.length};
+      }
+
+      const weights = targets.map(t => rankWeight(t.rank));
+      const totalWeight = weights.reduce((a,b) => a+b, 0);
+      let movedQty = 0;
+
+      problemAssignments.forEach(src => {
+        const qty = src.quantity;
+        if (!Number.isFinite(qty) || qty <= 0) return;
+
+        const shares = [];
+        let allocated = 0;
+        for (let i = 0; i < targets.length; i++) {
+          const q = Math.floor(qty * (weights[i] / totalWeight));
+          shares.push(q);
+          allocated += q;
+        }
+        let remainder = qty - allocated, rIndex = 0;
+        while (remainder-- > 0) shares[rIndex++ % shares.length]++;
+
+        shares.forEach((q, i) => {
+          if (q > 0) {
+            const sc = targets[i].code;
+            const key = `${src.itemNumber}|${sc}`;
+            const entry = redistributionDeltas[key] || {auto:0, manual:0};
+            if (typeof entry === 'number') {
+              redistributionDeltas[key] = {auto: entry + q, manual: 0};
+            } else {
+              entry.auto = (entry.auto || 0) + q;
+              redistributionDeltas[key] = entry;
+            }
+            redistributedItems.push({
+              itemNumber: src.itemNumber,
+              quantity: q,
+              storeCode: sc,
+              source: 'Redistributed'
+            });
+            movedQty += q;
+          }
+        });
+      });
+
+      itemsToSort = keep;
+      
+      redistributedItems.forEach(redItem => {
+        const idx = itemsToSort.findIndex(it => 
+          it.itemNumber === redItem.itemNumber && it.storeCode === redItem.storeCode
+        );
+        if (idx >= 0) {
+          itemsToSort[idx].quantity += redItem.quantity;
+          itemsToSort[idx].source = 'Redistributed';
+        } else {
+          itemsToSort.push(redItem);
+        }
+      });
+
+      updateImportDisplay();
+      lastResults = null;
+      showStatus(`<strong>✅ Redistributed:</strong> ${problemAssignments.length} line(s), ${movedQty} unit(s) → ${targets.length} eligible store(s).`, 'success');
+      updateDistributeButtonState();
+      saveAppState();
+      return {moved:movedQty, lines:problemAssignments.length, targets:targets.length};
+    };
+
+    const distributeAndResort = () => {
+      distributeProblemItems();
+      sortItems();
+      $('fullResultsSection').scrollIntoView({behavior:'smooth'});
+    };
+
+    const sortItems = () => {
+      if (itemsToSort.length === 0) { alert('Please import some items first'); return; }
+      showStatus('<div style="color:var(--pink-1);">Processing…</div>', 'info');
+      
+      setTimeout(() => {
+        const validItems = [];
+        const issues = [];
+        // Reset results virtualization for a fresh view
+        resultsStoreRenderLimit = RESULTS_STORE_CHUNK;
+        for (const k in expandedStoreItems) delete expandedStoreItems[k];
+        
+        itemsToSort.forEach(item => {
+          const store = getStoreByCode(item.storeCode);
+          if (!store) {
+            issues.push({type:'not_found', itemNumber:item.itemNumber, quantity:item.quantity, storeCode:item.storeCode, message:`Store ${item.storeCode} not found`});
+          } else if (!store.active) {
+            issues.push({type:'inactive', itemNumber:item.itemNumber, quantity:item.quantity, storeCode:item.storeCode, storeName:store.name, message:`Store ${item.storeCode} - ${store.name} is inactive`});
+          } else {
+            validItems.push({itemNumber:item.itemNumber, quantity:item.quantity, storeCode:item.storeCode, storeName:store.name, rank:store.rank});
+          }
+        });
+
+        const storeGroups = {};
+        validItems.forEach(item => {
+          const key = item.storeCode;
+          if (!storeGroups[key]) {
+            storeGroups[key] = {storeCode:key, storeName:item.storeName, rank:item.rank, items:[], totalQuantity:0};
+          }
+          storeGroups[key].items.push(item);
+          storeGroups[key].totalQuantity += item.quantity;
+        });
+
+        const sortedStores = sortStoresNumerically(Object.values(storeGroups));
+        displayResults({validItems, sortedStores, issues});
+        lastResults = {validItems, sortedStores, issues};
+
+        showStatus('<strong>✅ Complete.</strong> Results updated.', 'success');
+        $('totalProcessed').textContent = validItems.length + issues.length;
+
+        const section = $('fullResultsSection');
+        section.classList.remove('hidden');
+        updateDistributeButtonState();
+        section.scrollIntoView({behavior:'smooth'});
+        saveAppState();
+      }, 80);
+    };
+
+    // Copy utilities
+    const buildStoreClipboardText = (storeCode, asCSV) => {
+      const store = lastResults?.sortedStores?.find(s => s.storeCode === storeCode);
+      if (!store?.items?.length) return '';
+      return store.items
+        .slice()
+        .sort((a,b) => a.itemNumber.localeCompare(b.itemNumber))
+        .map(it => asCSV ? `${it.itemNumber},${it.quantity}` : `${it.itemNumber}\t${it.quantity}`)
+        .join('\n');
+    };
+
+    const copyTextToClipboard = async text => {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        return true;
+      } catch(e) { return false; }
+    };
+
+    const showToast = msg => {
+      const t = $('copyToast');
+      t.textContent = msg;
+      t.classList.toggle('toast-light', !document.body.classList.contains('dark-mode'));
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1800);
+    };
+
+    const toggleStoreCollapse = storeCode => {
+      collapsedStores[storeCode] = !collapsedStores[storeCode];
+      // When expanding a store, remove the "copied" state
+      if (!collapsedStores[storeCode]) {
+        copiedStores[storeCode] = false;
+      }
+      if (lastResults) displayResults(lastResults);
+      saveAppState();
+    };
+
+    const collapseAllStores = (collapse = true) => {
+      if (!lastResults?.sortedStores) return;
+      lastResults.sortedStores.forEach(s => { 
+        collapsedStores[s.storeCode] = collapse; 
+        // When expanding stores, remove the "copied" state
+        if (!collapse) {
+          copiedStores[s.storeCode] = false;
+        }
+      });
+      displayResults(lastResults);
+      saveAppState();
+    };
+
+    const copyStoreItems = async (storeCode, evt) => {
+      if (!lastResults) { showToast('Nothing to copy yet. Run "Sort by Store" first.'); return; }
+      const asCSV = evt && evt.altKey;
+      const text = buildStoreClipboardText(storeCode, asCSV);
+      if (!text) { showToast('No lines for this store.'); return; }
+      const ok = await copyTextToClipboard(text);
+      if (ok) {
+        showToast(asCSV ? 'Copied CSV: Item,Qty' : 'Copied: Item<TAB>Qty');
+        copiedStores[storeCode] = true;
+        collapsedStores[storeCode] = true;
+        displayResults(lastResults);
+        saveAppState();
+      } else {
+        showToast('Copy failed');
+      }
+    };
+
+    // Results display
+    const displayResults = ({validItems, sortedStores, issues}) => {
+      const hasAnyDeltas = Object.keys(redistributionDeltas).length > 0;
+
+      const issuesEl = $('issuesContainer');
+      if (issues.length > 0) {
+        issuesEl.classList.remove('hidden');
+        const totalIssueQty = issues.reduce((sum, issue) => sum + (Number(issue.quantity) || 0), 0);
+        const hasProblems = issues.some(i => i.type === 'inactive' || i.type === 'not_found');
+        const issueRowsHtml = issues.map(issue => {
+          const itemNumberRaw = String(issue.itemNumber ?? '');
+          const qtyRaw = Number(issue.quantity ?? 0);
+          const storeCodeRaw = String(issue.storeCode ?? '');
+          const messageRaw = String(issue.message ?? '');
+          const itemNumber = escapeHtml(itemNumberRaw);
+          const qtyDisplay = escapeHtml(String(qtyRaw));
+          const storeCode = escapeHtml(storeCodeRaw);
+          const message = escapeHtml(messageRaw);
+          const qtyAttr = escapeHtml(String(qtyRaw));
+          const itemAttr = escapeHtml(itemNumberRaw);
+          const storeAttr = escapeHtml(storeCodeRaw);
+          const issueColor = issue.type === 'not_found' ? 'var(--danger)' : 'var(--warning)';
+          return `
+                    <tr>
+                      <td><strong>${itemNumber}</strong></td>
+                      <td>${qtyDisplay}</td>
+                      <td>${storeCode}</td>
+                      <td style="color:${issueColor};">${message}</td>
+                      <td>
+                        <select class="assign-select min-w-220" data-item="${itemAttr}" data-store="${storeAttr}" data-qty="${qtyAttr}">
+                          ${buildStoreOptionsHTML(storeCodeRaw)}
+                        </select>
+                      </td>
+                    </tr>`;
+        }).join('');
+        issuesEl.innerHTML = `
+          <div class="simple-alert alert-warning" style="margin-bottom:12px;">
+            <strong>Attention: ${issues.length} Items Need Attention</strong>
+          </div>
+          <div class="store-pane">
+            <div class="store-pane-header">
+              <div class="store-pane-title">Items Requiring Manual Handling</div>
+              <div class="store-pane-stats">${escapeHtml(String(totalIssueQty))} units</div>
+            </div>
+            <div class="store-pane-body">
+              <table class="store-pane-table sticky-head">
+                <thead><tr><th>Item</th><th>Qty</th><th>Store Code</th><th>Issue</th><th>Assign To</th></tr></thead>
+                <tbody>
+                  ${issueRowsHtml}
+                </tbody>
+              </table>
+            </div>
+            <div class="store-pane-actions">
+              <button class="big-button success" onclick="assignSelectedIssues()" title="Move selected problem items to the chosen target stores and re-sort results">Manual Assign Selected + Re-Sort</button>
+              <button id="distributeBtn" class="big-button" onclick="distributeAndResort()"
+                      ${hasProblems ? '' : 'disabled'}
+                      title="${hasProblems ? 'Automatically redistribute items from inactive or unknown stores to active stores based on rank priority, then re-sort results' : 'No problem items to distribute'}">
+                Auto-Distribute Problems to Active Stores
+              </button>
+            </div>
+          </div>`;
+        applySavedAssignSelections();
+        attachAssignSelectHandlers();
+        issuesEl.classList.add('update-flash');
+        setTimeout(()=>issuesEl.classList.remove('update-flash'), 450);
+      } else {
+        issuesEl.classList.add('hidden');
+        issuesEl.innerHTML = '';
+      }
+
+      const totalStores = sortedStores.length;
+      const storeLimit = Math.min(resultsStoreRenderLimit, totalStores);
+      const visibleStores = sortedStores.slice(0, storeLimit);
+
+      const resultsEl = $('resultsContainer');
+      const storeCardsHtml = visibleStores.map(store => {
+        const storeCodeRaw = String(store.storeCode ?? '');
+        const storeNameRaw = String(store.storeName ?? '');
+        const storeRankRaw = String(store.rank ?? '');
+        const storeCode = escapeHtml(storeCodeRaw);
+        const storeName = escapeHtml(storeNameRaw);
+        const storeRank = escapeHtml(storeRankRaw);
+        const rankClass = getRankClass(storeRankRaw);
+        const itemsSorted = store.items.slice().sort((a,b) => String(a.itemNumber ?? '').localeCompare(String(b.itemNumber ?? '')));
+        const expanded = !!expandedStoreItems[storeCodeRaw];
+        const itemsLimited = expanded ? itemsSorted : itemsSorted.slice(0, RESULTS_ITEMS_CHUNK);
+        const storeDeltaAuto = itemsSorted.reduce((sum,it) => {
+          const deltaKey = `${it.itemNumber}|${store.storeCode}`;
+          const raw = redistributionDeltas[deltaKey];
+          return sum + (typeof raw === 'number' ? raw : (raw?.auto || 0));
+        }, 0);
+        const storeDeltaManual = itemsSorted.reduce((sum,it) => {
+          const deltaKey = `${it.itemNumber}|${store.storeCode}`;
+          const raw = redistributionDeltas[deltaKey];
+          return sum + (typeof raw === 'number' ? 0 : (raw?.manual || 0));
+        }, 0);
+        const isCollapsed = collapsedStores[storeCodeRaw];
+        const isCopied = copiedStores[storeCodeRaw];
+        const headerClass = (isCollapsed && isCopied) ? 'copied-collapsed' : '';
+        const collapseLabel = isCollapsed ? 'Expand' : 'Collapse';
+        const collapseIcon = isCollapsed ? '>' : 'v';
+        const tableRows = itemsLimited.map(it => {
+          const itemNumber = escapeHtml(String(it.itemNumber ?? ''));
+          const itemQuantity = escapeHtml(String(it.quantity ?? ''));
+          const deltaKey = `${it.itemNumber}|${store.storeCode}`;
+          const deltaRaw = redistributionDeltas[deltaKey];
+          const dAuto = typeof deltaRaw === 'number' ? deltaRaw : (deltaRaw?.auto || 0);
+          const dManual = typeof deltaRaw === 'number' ? 0 : (deltaRaw?.manual || 0);
+          const rowClass = `${dAuto>0 ? 'redistributed-row' : ''} ${dManual>0 ? 'manual-row' : ''}`.trim();
+          const manualBadge = dManual > 0 ? ` <span class="delta-badge manual">+${dManual}</span>` : '';
+          const autoBadge = dAuto > 0 ? ` <span class="delta-badge auto">+${dAuto}</span>` : '';
+          return `
+                        <tr class="${rowClass}">
+                          <td><strong>${itemNumber}</strong></td>
+                          <td>${itemQuantity}${manualBadge}${autoBadge}</td>
+                          <td>${storeCode}</td>
+                        </tr>`;
+        }).join('');
+        const remainingCount = Math.max(itemsSorted.length - itemsLimited.length, 0);
+        const showMoreBlock = (!expanded && remainingCount > 0)
+          ? `
+                    <div style="display:flex;justify-content:center;margin-top:8px;">
+                      <button class="big-button" data-store-code="${storeCode}" onclick="expandStoreItems(this.dataset.storeCode)">Show ${remainingCount} more</button>
+                    </div>` : '';
+        return `
+              <div class="store-pane ${isCollapsed ? 'collapsed' : ''}">
+                <div class="store-pane-header ${headerClass}">
+                  <div class="store-pane-title">
+                    <button class="collapse-toggle" data-store-code="${storeCode}" onclick="toggleStoreCollapse(this.dataset.storeCode)" title="${collapseLabel}">
+                      <span class="chev">${collapseIcon}</span> ${collapseLabel}
+                    </button>
+                    ${storeCode} - ${storeName}
+                    <span class="rank-badge rank-${rankClass}" style="margin-left:4px;background:var(--help-btn-bg);">${storeRank}</span>
+                    ${isCopied ? '<span class="copied-badge" title="Copied to clipboard">Copied</span>' : ''}
+                  </div>
+                  <div class="store-pane-stats">
+                    ${escapeHtml(String(store.totalQuantity ?? 0))} units total
+                    ${storeDeltaManual > 0 ? `<span class="delta-badge manual">+${storeDeltaManual}</span>` : ''}
+                    ${storeDeltaAuto > 0 ? `<span class="delta-badge auto">+${storeDeltaAuto}</span>` : ''}
+                    <button class="copy-btn" title="Copy Item & Qty (Tab). Hold Alt for CSV" data-store-code="${storeCode}" onclick="copyStoreItems(this.dataset.storeCode, event)">Copy</button>
+                  </div>
+                </div>
+                <div class="store-pane-body">
+                  <table class="store-pane-table sticky-head">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Code</th></tr></thead>
+                    <tbody>
+                      ${tableRows}
+                    </tbody>
+                  </table>
+                  ${showMoreBlock}
+                </div>
+              </div>`;
+      }).join('');
+
+      resultsEl.innerHTML = `
+        <div class="results-title">Items Sorted by Store</div>
+        <div class="simple-alert alert-info">
+          <strong>Items Sorted by Store</strong> - ${escapeHtml(String(validItems.length))} items sorted to ${escapeHtml(String(sortedStores.length))} active stores
+          ${hasAnyDeltas ? `<div class="legend-note">Green = auto, Yellow = manual additions.</div>` : ''}
+        </div>
+        <div class="store-panes">
+          ${storeCardsHtml}
+        </div>
+        ${totalStores > storeLimit ? `
+          <div style="display:flex;justify-content:center;margin-top:8px;">
+            <button class="big-button" onclick="loadMoreStores()">Show more stores (${totalStores - storeLimit})</button>
+          </div>` : ''}`;
+      resultsEl.classList.add('update-flash');
+      setTimeout(()=>resultsEl.classList.remove('update-flash'), 450);
+      updateDistributeButtonState();
+      if (typeof syncSidebarToQueue === 'function') syncSidebarToQueue();
+    };
+
+    const loadMoreStores = () => {
+      if (!lastResults?.sortedStores) return;
+      resultsStoreRenderLimit = Math.min(resultsStoreRenderLimit + RESULTS_STORE_CHUNK, lastResults.sortedStores.length);
+      displayResults(lastResults);
+    };
+
+    const expandStoreItems = (storeCode) => {
+      expandedStoreItems[storeCode] = true;
+      if (lastResults) displayResults(lastResults);
+    };
+
+    // Export functionality
+    const exportResults = () => {
+      if (!lastResults && itemsToSort.length === 0) {
+        alert('No data to export. Please import and sort items first.');
+        return;
+      }
+      
+      const wb = XLSX.utils.book_new();
+      const now = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      const stamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+
+      const dataSource = lastResults || generateQuickResults();
+      const rows = [['Store Code','Store Name','Rank','Item','Qty']];
+      
+      if (dataSource.sortedStores?.length) {
+        dataSource.sortedStores
+          .slice()
+          .sort((a,b) => (parseInt(a.storeCode)||999999) - (parseInt(b.storeCode)||999999))
+          .forEach(store => {
+            store.items
+              .slice()
+              .sort((a,b) => a.itemNumber.localeCompare(b.itemNumber))
+              .forEach(it => rows.push([store.storeCode, store.storeName, store.rank, it.itemNumber, it.quantity]));
+          });
+      }
+
+      const wsAll = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, wsAll, 'All Stores');
+
+      if (dataSource.issues?.length) {
+        const issuesRows = [['Item','Qty','Store Code','Issue']];
+        dataSource.issues.forEach(i => issuesRows.push([i.itemNumber, i.quantity, i.storeCode, i.message]));
+        const wsIssues = XLSX.utils.aoa_to_sheet(issuesRows);
+        XLSX.utils.book_append_sheet(wb, wsIssues, 'Issues');
+      }
+
+      XLSX.writeFile(wb, `Inventory_Sorting_${stamp}.xlsx`);
+    };
+
+    const generateQuickResults = () => {
+      const issues = [];
+      const storeGroups = {};
+      
+      itemsToSort.forEach(item => {
+        const store = getStoreByCode(item.storeCode);
+        if (!store) {
+          issues.push({type:'not_found', ...item, message:`Store ${item.storeCode} not found`});
+          return;
+        }
+        if (!store.active) {
+          issues.push({type:'inactive', ...item, storeName:store.name, message:`Store ${item.storeCode} - ${store.name} is inactive`});
+          return;
+        }
+        
+        const key = store.code;
+        if (!storeGroups[key]) {
+          storeGroups[key] = {storeCode: key, storeName: store.name, rank: store.rank, items: [], totalQuantity: 0};
+        }
+        storeGroups[key].items.push({itemNumber: item.itemNumber, quantity: item.quantity, storeCode: key, storeName: store.name, rank: store.rank});
+        storeGroups[key].totalQuantity += item.quantity;
+      });
+      
+      return {
+        sortedStores: sortStoresNumerically(Object.values(storeGroups)),
+        issues,
+        validItems: Object.values(storeGroups).flatMap(s => s.items)
+      };
+    };
+
+    const startOver = () => {
+      if (confirm('Start over? This will clear everything.')) {
+        try {
+          itemsToSort.length = 0;
+          lastResults = null;
+          redistributionDeltas = {};
+          currentWorkbook = null;
+          for (let key in collapsedStores) delete collapsedStores[key];
+          for (let key in copiedStores) delete copiedStores[key];
+          for (let key in manualAssignSelections) delete manualAssignSelections[key];
+          for (let key in expandedStoreItems) delete expandedStoreItems[key];
+          importRenderLimit = IMPORT_CHUNK;
+          resultsStoreRenderLimit = RESULTS_STORE_CHUNK;
+          const fileInput = $('fileInput');
+          const pasteArea = $('pasteArea');
+          const fileStatus = $('fileStatus');
+          if (fileInput) { fileInput.value = ''; fileInput.files = null; }
+          if (pasteArea) pasteArea.value = '';
+          if (fileStatus) fileStatus.innerHTML = '';
+          const sortingStatus = $('sortingStatus');
+          const resultsStatus = $('resultsStatus');
+          if (sortingStatus) sortingStatus.innerHTML = '';
+          if (resultsStatus) resultsStatus.innerHTML = '';
+          const fullResultsSection = $('fullResultsSection');
+          const resultsContainer = $('resultsContainer');
+          const issuesContainer = $('issuesContainer');
+          if (fullResultsSection) fullResultsSection.classList.add('hidden');
+          if (resultsContainer) resultsContainer.innerHTML = '';
+          if (issuesContainer) { issuesContainer.innerHTML = ''; issuesContainer.classList.add('hidden'); }
+          ['itemCount','storeDestinationCount','totalProcessed'].forEach(id => $(id).textContent = '0');
+          updateImportDisplay();
+          updateDistributeButtonState();
+          updateStoreCounts();
+          clearAppState();
+          setTimeout(() => showStatus('<strong>✅ Reset complete.</strong> Ready for new data.', 'success'), 100);
+        } catch (error) {
+          alert(`Reset encountered an error: ${error.message}. Please refresh the page.`);
+        }
+      }
+    };
+
+    // Theme is centralized in theme.js. The page now relies on SSSuiteTheme (with a small inline fallback).
+
+    // Use helpers exposed by theme.js via window.SSSuiteTheme (cssVar, hexToRgba, setTheme, ...)
+
+    const updateDistributeButtonState = () => {
+      const btn = $('distributeBtn');
+      if (!btn) return;
+      const needed = hasProblemAssignments();
+      const hasEligibleTargets = getActiveTargetsInCurrentResults().length > 0;
+      btn.disabled = !(needed && hasEligibleTargets);
+      btn.title = !needed ? 'No inactive or unknown-store items to distribute' : 
+                  (!hasEligibleTargets ? 'No eligible target stores in current results' : 'Redistribute problem items to active stores (rank-weighted)');
+    };
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if ($('helpOverlay').style.display === 'flex') hideHelpOverlay();
+        if ($('devOverlay') && $('devOverlay').style.display === 'flex') hideDevOverlay();
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.SSSuiteTheme && typeof window.SSSuiteTheme.initTheme === 'function') {
+          window.SSSuiteTheme.initTheme();
+        } else {
+          // Inline fallback: respect saved theme if present, otherwise default to dark
+          try {
+            const saved = localStorage.getItem('appTheme');
+            if (saved) document.documentElement.setAttribute('data-theme', saved);
+            else document.documentElement.setAttribute('data-theme', 'dark');
+          } catch(_) {
+            try { document.documentElement.setAttribute('data-theme', 'dark'); } catch(_) {}
+          }
+        }
+      } catch(_) {
+        try { document.documentElement.setAttribute('data-theme', 'dark'); } catch(_) {}
+      }
+      loadAppState();
+      loadUserPreferences();
+      updateStoreStatus();
+      updateImportDisplay();
+      updateDistributeButtonState();
+      // Back-to-top setup
+      updateBackToTopVisibility();
+      const btt = $('backToTopBtn');
+      if (btt) btt.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+      // Align sidebar card bottom to item queue area
+      setTimeout(syncSidebarToQueue, 0);
+      // Drag & drop file import
+      const ua = $('uploadArea');
+      if (ua) {
+        ua.addEventListener('dragover', e => { e.preventDefault(); ua.classList.add('dragover'); });
+        ua.addEventListener('dragleave', () => ua.classList.remove('dragover'));
+        ua.addEventListener('drop', e => {
+          e.preventDefault(); ua.classList.remove('dragover');
+          const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (f) { $('fileStatus').innerHTML = '📊 Reading file...'; importFile(f); }
+        });
+      }
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (ev) => {
+        const tag = (ev.target && ev.target.tagName || '').toLowerCase();
+        const typing = tag === 'input' || tag === 'textarea' || ev.target.isContentEditable;
+        if (typing) return;
+        if (ev.key === '?') { showHelpOverlay(); ev.preventDefault(); }
+        // While Help is open, Ctrl+Alt+D opens Dev overlay
+        if ((ev.ctrlKey && ev.altKey && (ev.key === 'd' || ev.key === 'D')) && $('helpOverlay').style.display === 'flex') {
+          openDevFromHelp();
+          ev.preventDefault();
+        }
+        if (ev.key === 's' || ev.key === 'S') { sortItems(); ev.preventDefault(); }
+        if (ev.key === 'e' || ev.key === 'E') { exportResults(); ev.preventDefault(); }
+        if (ev.key === 'd' || ev.key === 'D') { const b=$('distributeBtn'); if (b && !b.disabled) { distributeAndResort(); } ev.preventDefault(); }
+        if (ev.key === 'm' || ev.key === 'M') { if (typeof assignSelectedIssues === 'function') assignSelectedIssues(); ev.preventDefault(); }
+        if (ev.key === 'a') { toggleAllStores(true); ev.preventDefault(); }
+        if (ev.key === 'A') { toggleAllStores(false); ev.preventDefault(); }
+        if (ev.key === 'f' || ev.key === 'F') { const si=$('storeSearchInput'); if (si){ si.focus(); ev.preventDefault(); } }
+      });
+      // Hidden triggers inside Help
+      try {
+        const helpTitle = document.querySelector('#helpOverlay h2');
+        if (helpTitle) helpTitle.addEventListener('dblclick', openDevFromHelp);
+        const t = $('devHiddenTrigger');
+        if (t) t.addEventListener('click', openDevFromHelp);
+      } catch {}
+      // Persist theme selection when centralized theme changes (keeps legacy save behavior)
+      try {
+        window.addEventListener('sssuite-theme-changed', (e) => {
+          try { saveUserPreferences(); } catch(_) {}
+        });
+      } catch(_) {}
+    });
+
+    const updateBackToTopVisibility = () => {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      const btt = $('backToTopBtn');
+      if (!btt) return;
+      if (y > 250) btt.classList.add('show'); else btt.classList.remove('show');
+    };
+    window.addEventListener('scroll', updateBackToTopVisibility, {passive:true});
+
+    window.addEventListener('beforeunload', saveAppState);
+
+    // Sidebar height alignment to the two-col (Import Queue + Actions) area
+    let _resizeAlignTimer = null;
+    const syncSidebarToQueue = () => {
+      try {
+        if (window.matchMedia('(max-width: 1100px)').matches) {
+          const lc = document.querySelector('.sidebar .card');
+          if (lc) lc.style.height = '';
+          return;
+        }
+        const leftCard = document.querySelector('.sidebar .card');
+        const twoCol = document.querySelector('.two-col');
+        if (!leftCard || !twoCol) return;
+        const leftTop = leftCard.getBoundingClientRect().top;
+        const bottom = twoCol.getBoundingClientRect().bottom;
+        const h = Math.max(200, Math.round(bottom - leftTop));
+        leftCard.style.height = h + 'px';
+      } catch (e) {}
+    };
+    window.addEventListener('resize', () => {
+      clearTimeout(_resizeAlignTimer);
+      _resizeAlignTimer = setTimeout(syncSidebarToQueue, 60);
+    });
+
+    // Scroll hint fades for scrollable store lists
+    function initScrollHints(ctx){
+      try {
+        const root = ctx || document;
+        const panes = root.querySelectorAll('.store-pane-body');
+        panes.forEach(p => {
+          let hint = p.querySelector('.scroll-hint');
+          if (!hint) {
+            hint = document.createElement('div');
+            hint.className = 'scroll-hint';
+            hint.setAttribute('aria-hidden','true');
+            hint.textContent = 'Scroll for more';
+          }
+          if (!p.querySelector('.fade-top')){
+            const ft = document.createElement('div');
+            ft.className = 'fade-top';
+            p.insertBefore(ft, p.firstChild);
+          }
+          if (!p.querySelector('.fade-bottom')){
+            const fb = document.createElement('div');
+            fb.className = 'fade-bottom';
+            p.appendChild(fb);
+          }
+          if (!p.__scrollHintUpdate){
+            const update = () => {
+              const has = (p.scrollHeight - p.clientHeight) > 2;
+              if (has) p.classList.add('scrollable'); else p.classList.remove('scrollable');
+              const atTop = p.scrollTop <= 0;
+              const atBottom = (p.scrollTop + p.clientHeight) >= (p.scrollHeight - 1);
+              p.classList.toggle('at-top', atTop);
+              p.classList.toggle('at-bottom', atBottom);
+              const hintEl = p.querySelector('.scroll-hint');
+              if (hintEl) {
+                if (has && !atBottom) hintEl.classList.add('show'); else hintEl.classList.remove('show');
+              }
+            };
+            p.__scrollHintUpdate = update;
+            p.addEventListener('scroll', update, {passive:true});
+            window.addEventListener('resize', update);
+          }
+          if (typeof p.__scrollHintUpdate === 'function') {
+            p.__scrollHintUpdate();
+          }
+        });
+      } catch {}
+    }
+
+    // Make the entire visual Help area clickable and keyboard-activatable
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        const helpWrap = document.querySelector('.help-button');
+        if (helpWrap) {
+          helpWrap.addEventListener('click', () => { if (typeof showHelpOverlay === 'function') showHelpOverlay(); });
+          helpWrap.setAttribute('role','button');
+          helpWrap.setAttribute('tabindex','0');
+          helpWrap.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (typeof showHelpOverlay === 'function') showHelpOverlay(); }
+          });
+        }
+      } catch {}
+    });
+
+    // Ensure Manual Assign and Auto-Distribute buttons match highlight colors
+    (function(){
+      function styleActionButtons(ctx){
+        try {
+          const root = ctx || document;
+          const manualBtn = Array.from(root.querySelectorAll('button.big-button[onclick^="assignSelectedIssues"]'))[0];
+          if (manualBtn) {
+            manualBtn.id = 'manualAssignBtn';
+            manualBtn.classList.remove('success');
+            if (!manualBtn.classList.contains('warning')) manualBtn.classList.add('warning');
+          }
+          const distributeBtn = document.getElementById('distributeBtn');
+          if (distributeBtn) {
+            if (!distributeBtn.classList.contains('success')) distributeBtn.classList.add('success');
+          }
+        } catch(e) { /* no-op */ }
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        styleActionButtons();
+        const issues = document.getElementById('issuesContainer');
+        if (issues && 'MutationObserver' in window) {
+          const mo = new MutationObserver(() => styleActionButtons(issues));
+          mo.observe(issues, { childList: true, subtree: true });
+        }
+        // Initialize scroll hints on load and when results change
+        initScrollHints();
+        const results = document.getElementById('resultsContainer');
+        if (results && 'MutationObserver' in window){
+          const mo2 = new MutationObserver(() => initScrollHints(results));
+          mo2.observe(results, { childList:true, subtree:true });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
