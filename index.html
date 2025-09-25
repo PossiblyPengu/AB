@@ -644,6 +644,30 @@
 
     const GENERIC_STORE_TOKENS = new Set(['STORE', 'STORES', 'SHOP', 'SHOPPE', 'LOCATION', 'LOC', 'OUTLET', 'BRANCH', 'DEPARTMENT', 'DEPT']);
 
+    const existingCssVarFn = typeof window !== 'undefined' && typeof window.cssVar === 'function'
+      ? window.cssVar.bind(window)
+      : null;
+
+    const cssVar = (name, fallback = '') => {
+      const themeCssVar = window?.SSSuiteTheme?.cssVar;
+      if (typeof themeCssVar === 'function') {
+        try { return themeCssVar(name, fallback); } catch (_) {}
+      }
+      if (existingCssVarFn) {
+        try { return existingCssVarFn(name, fallback); } catch (_) {}
+      }
+      try {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(name);
+        const trimmed = (value || '').toString().trim();
+        if (trimmed) return trimmed;
+      } catch (_) {}
+      return fallback || '';
+    };
+
+    if (typeof window !== 'undefined' && typeof window.cssVar !== 'function') {
+      try { window.cssVar = cssVar; } catch (_) {}
+    }
+
         const dictionaryState = {
       loadPromise: null,
       ready: false,
@@ -2001,9 +2025,9 @@
         const store = getStoreByCode(item.storeCode);
         const status = !store ? 'NOT FOUND' : (store.active ? 'ACTIVE' : 'INACTIVE');
         // Use theme tokens for status colors; fall back to the original hex values if tokens are missing.
-  const danger = cssVar('--danger');
-  const success = cssVar('--success-2');
-  const warning = cssVar('--warning');
+  const danger = cssVar('--danger', '#ef4444');
+  const success = cssVar('--success-2', '#22c55e');
+  const warning = cssVar('--warning', '#f59e0b');
         const statusColor = !store ? danger : (store.active ? success : warning);
         return `
           <div class="queue-item">
